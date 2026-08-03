@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
+import 'package:maharashtra_tyres/services/inventory_service.dart';
 import 'dart:convert';
 
 class RemindersScreen extends StatefulWidget {
@@ -37,31 +38,34 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Future<void> _loadReminders() async {
     setState(() => _isLoading = true);
 
-    // 1. Load saved local reminders
-    List<Map<String, dynamic>> localReminders = [];
+    // 1. Load user custom reminders (and purge any old static demo items rem_1..rem_4)
+    List<Map<String, dynamic>> userReminders = [];
     final prefs = await SharedPreferences.getInstance();
     final jsonStr = prefs.getString('saved_reminders_list');
 
     if (jsonStr != null && jsonStr.isNotEmpty) {
       try {
         final List decoded = jsonDecode(jsonStr);
-        localReminders = List<Map<String, dynamic>>.from(decoded);
+        userReminders = List<Map<String, dynamic>>.from(decoded).where((r) {
+          final id = r['id']?.toString() ?? '';
+          return !id.startsWith('rem_') || int.tryParse(id.replaceAll('rem_', '')) == null;
+        }).toList();
       } catch (_) {
-        localReminders = _getDefaultReminders();
+        userReminders = [];
       }
-    } else {
-      localReminders = _getDefaultReminders();
     }
 
-    // 2. Fetch real-time overdue bill reminders (>10 days) from API
-    List<Map<String, dynamic>> apiReminders = [];
+    // 2. Dynamic Reminders List
+    List<Map<String, dynamic>> dynamicReminders = [];
+
+    // A. Fetch real-time overdue bill reminders (>10 days) from API
     try {
       final fetchedApi = await InvoiceService.fetchOverdueReminders(days: 10);
-      apiReminders = fetchedApi.map((item) {
+      final apiReminders = fetchedApi.map((item) {
         final rawDate = item['due_date']?.toString() ?? '';
         final datePart = rawDate.contains('T') ? rawDate.split('T')[0] : rawDate;
         return {
-          'id': item['id']?.toString() ?? 'rem_${DateTime.now().millisecondsSinceEpoch}',
+          'id': item['id']?.toString() ?? 'inv_rem_${DateTime.now().millisecondsSinceEpoch}',
           'invoice_id': item['id'],
           'title': item['title'] ?? 'Collect payment for ${item['invoice_number']} from ${item['customer_name']}',
           'category': 'Payment Due',
@@ -77,70 +81,47 @@ class _RemindersScreenState extends State<RemindersScreen> {
           'is_api': true,
         };
       }).toList();
+      dynamicReminders.addAll(apiReminders);
     } catch (e) {
       debugPrint('Error fetching API reminders: $e');
     }
 
-    // 3. Merge API reminders with local reminders without duplication
-    final existingIds = localReminders.map((r) => r['id']).toSet();
-    final uniqueApiReminders = apiReminders.where((r) => !existingIds.contains(r['id'])).toList();
+    // B. Dynamically generate Low Stock alerts from real Inventory API
+    try {
+      final inventoryItems = await InventoryService.fetchInventory();
+      final todayStr = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
 
-    _reminders = [...uniqueApiReminders, ...localReminders];
+      for (final item in inventoryItems) {
+        final qty = int.tryParse(item['quantity']?.toString() ?? item['stock']?.toString() ?? '10') ?? 10;
+        if (qty <= 5) {
+          final prodName = item['product_name'] ?? item['name'] ?? 'Tyre Item';
+          dynamicReminders.add({
+            'id': 'stock_low_${item['id'] ?? prodName}',
+            'title': 'Reorder $prodName (Only $qty left in stock)',
+            'category': 'Stock Reorder',
+            'priority': 'High',
+            'due_date': todayStr,
+            'time': '09:00 AM',
+            'completed': false,
+            'notes': 'Stock level is critical ($qty units remaining)',
+            'is_api': true,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching low stock reminders: $e');
+    }
+
+    // 3. Merge dynamic reminders with user custom reminders without duplication
+    final existingIds = userReminders.map((r) => r['id']).toSet();
+    final uniqueDynamicReminders = dynamicReminders.where((r) => !existingIds.contains(r['id'])).toList();
+
+    _reminders = [...uniqueDynamicReminders, ...userReminders];
     await _saveReminders();
 
     if (mounted) {
       setState(() => _isLoading = false);
     }
-  }
-
-  List<Map<String, dynamic>> _getDefaultReminders() {
-    final today = DateTime.now();
-    final todayStr = "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
-    final tomorrow = today.add(const Duration(days: 1));
-    final tomorrowStr = "${tomorrow.year}-${tomorrow.month.toString().padLeft(2, '0')}-${tomorrow.day.toString().padLeft(2, '0')}";
-
-    return [
-      {
-        'id': 'rem_1',
-        'title': 'Collect payment of ₹6,500 for INV-1003 from Amit Shinde',
-        'category': 'Payment Due',
-        'priority': 'High',
-        'due_date': todayStr,
-        'time': '05:00 PM',
-        'completed': false,
-        'notes': 'Call customer on +91 98765 43210',
-      },
-      {
-        'id': 'rem_2',
-        'title': 'Reorder MRF ZLX 165/80 R14 (Only 2 left in stock)',
-        'category': 'Stock Reorder',
-        'priority': 'High',
-        'due_date': todayStr,
-        'time': '06:30 PM',
-        'completed': false,
-        'notes': 'Contact MRF wholesaler manager',
-      },
-      {
-        'id': 'rem_3',
-        'title': 'Follow up for tyre alignment service with Rohan Patil',
-        'category': 'Customer Service',
-        'priority': 'Medium',
-        'due_date': tomorrowStr,
-        'time': '11:00 AM',
-        'completed': false,
-        'notes': 'Scheduled 1st free alignment check',
-      },
-      {
-        'id': 'rem_4',
-        'title': 'Send monthly GST sales report to accountant',
-        'category': 'General',
-        'priority': 'Normal',
-        'due_date': tomorrowStr,
-        'time': '02:00 PM',
-        'completed': true,
-        'notes': 'Export invoices PDF from dashboard',
-      },
-    ];
   }
 
   Future<void> _saveReminders() async {
