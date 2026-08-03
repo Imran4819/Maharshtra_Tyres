@@ -131,221 +131,195 @@ class _OtpLoginScreenState extends State<OtpLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final isDesktop = size.width >= 600;
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.background,
-              Colors.white,
-              AppColors.primarySoft.withValues(alpha: 0.7),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      backgroundColor: const Color(0xFFF1F5F9), // Single cohesive slate background
+      body: Stack(
+        children: [
+          // Soft ambient blobs
+          Positioned(
+            top: -40,
+            right: -30,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.04),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Positioned(
-                top: -40,
-                right: -30,
-                child: _GlowBlob(color: AppColors.primary.withValues(alpha: 0.08), size: 180),
+          Positioned(
+            bottom: -50,
+            left: -40,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.04),
               ),
-              Positioned(
-                bottom: -60,
-                left: -50,
-                child: _GlowBlob(color: AppColors.primary.withValues(alpha: 0.06), size: 230),
-              ),
-              Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: size.width < 560 ? 460 : 520,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.96),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: AppColors.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 30,
-                            offset: const Offset(0, 16),
-                          ),
-                        ],
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isDesktop ? 480 : 440,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 30,
+                        offset: const Offset(0, 15),
                       ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primarySoft,
-                                  borderRadius: BorderRadius.circular(22),
-                                ),
-                                child: const Icon(
-                                  Icons.sms_rounded,
-                                  size: 36,
-                                  color: AppColors.primary,
-                                ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Logo icon
+                        Center(
+                          child: Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.sms_rounded,
+                              size: 32,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Login with OTP',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Enter your email or mobile number to receive a verification code.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+                        // Email/Phone Input
+                        TextFormField(
+                          controller: _identifierController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'Email or mobile number',
+                            hintText: 'Enter email or 10-digit number',
+                            prefixIcon: Icon(Icons.mark_email_read_outlined, size: 20),
+                          ),
+                          validator: _validateIdentifier,
+                          onFieldSubmitted: (_) => _sendOtp(),
+                        ),
+                        const SizedBox(height: 18),
+                        // Secure alert box
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.verified_user_outlined,
+                                color: AppColors.primary,
+                                size: 20,
                               ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'Login with OTP',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                                    color: AppColors.textPrimary,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Enter your email or mobile number to receive a verification code.',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'We will send a one-time code to your registered email or mobile number for secure access.',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
                                     color: AppColors.textSecondary,
+                                    height: 1.4,
                                   ),
-                            ),
-                            const SizedBox(height: 28),
-                            _FieldLabel(
-                              label: 'Email or mobile number',
-                              icon: Icons.person_outline_rounded,
-                            ),
-                            const SizedBox(height: 8),
-                            TextFormField(
-                              controller: _identifierController,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.done,
-                              decoration: const InputDecoration(
-                                hintText: 'Enter email or 10-digit mobile number',
-                                prefixIcon: Icon(Icons.mark_email_read_outlined),
+                                ),
                               ),
-                              validator: _validateIdentifier,
-                              onFieldSubmitted: (_) => _sendOtp(),
-                            ),
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppColors.background,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        // Send OTP button
+                        SizedBox(
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _sendOtp,
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
                               ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(
-                                    Icons.verified_user_outlined,
-                                    color: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'We will send a one-time code to your registered email or mobile number for secure access.',
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                             SizedBox(
-                               height: 54,
-                               child: ElevatedButton(
-                                 onPressed: _isLoading ? null : _sendOtp,
-                                 child: _isLoading
-                                     ? const SizedBox(
-                                         width: 20,
-                                         height: 20,
-                                         child: CircularProgressIndicator(
-                                           strokeWidth: 2,
-                                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                         ),
-                                       )
-                                     : const Text('Send OTP'),
-                               ),
-                             ),
-                            const SizedBox(height: 12),
-                            OutlinedButton(
-                              onPressed: () {
-                                Navigator.maybePop(context);
-                              },
-                              child: const Text('Use password login'),
-                            ),
-                          ],
+                                  )
+                                : const Text('Send OTP'),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 14),
+                        // Password login option
+                        SizedBox(
+                          height: 52,
+                          child: OutlinedButton(
+                            onPressed: () {
+                              Navigator.maybePop(context);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              side: const BorderSide(color: AppColors.border),
+                            ),
+                            child: const Text(
+                              'Use password login',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FieldLabel extends StatelessWidget {
-  final String label;
-  final IconData icon;
-
-  const _FieldLabel({
-    required this.label,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 18,
-          color: AppColors.textSecondary,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-      ],
-    );
-  }
-}
-
-class _GlowBlob extends StatelessWidget {
-  final Color color;
-  final double size;
-
-  const _GlowBlob({
-    required this.color,
-    required this.size,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
+        ],
       ),
     );
   }

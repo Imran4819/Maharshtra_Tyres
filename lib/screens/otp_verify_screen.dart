@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -306,243 +305,249 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final isDesktop = size.width >= 600;
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              AppColors.background,
-              Colors.white,
-              AppColors.primarySoft.withValues(alpha: 0.7),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      backgroundColor: const Color(0xFFF1F5F9), // Single cohesive slate background
+      body: Stack(
+        children: [
+          // Soft ambient blobs
+          Positioned(
+            top: -40,
+            right: -30,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.04),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Positioned(
-                top: -40,
-                right: -30,
-                child: _GlowBlob(color: AppColors.primary.withValues(alpha: 0.08), size: 180),
+          Positioned(
+            bottom: -50,
+            left: -40,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withValues(alpha: 0.04),
               ),
-              Positioned(
-                bottom: -60,
-                left: -50,
-                child: _GlowBlob(color: AppColors.primary.withValues(alpha: 0.06), size: 230),
-              ),
-              Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: size.width < 560 ? 460 : 520,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(28),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.96),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: AppColors.border),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 30,
-                            offset: const Offset(0, 16),
-                          ),
-                        ],
+            ),
+          ),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isDesktop ? 480 : 440,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 30,
+                        offset: const Offset(0, 15),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Center(
-                            child: Container(
-                              width: 72,
-                              height: 72,
-                              decoration: BoxDecoration(
-                                color: AppColors.primarySoft,
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                              child: const Icon(
-                                Icons.phonelink_lock_rounded,
-                                size: 36,
-                                color: AppColors.primary,
-                              ),
-                            ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Logo icon
+                      Center(
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Verify OTP',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                                  color: AppColors.textPrimary,
-                                ),
+                          child: const Icon(
+                            Icons.phonelink_lock_rounded,
+                            size: 32,
+                            color: AppColors.primary,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Enter the 4-digit code sent to $_displayIdentifier',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                          ),
-                          const SizedBox(height: 28),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: List.generate(4, (index) {
-                              return SizedBox(
-                                width: 56,
-                                height: 64,
-                                child: TextFormField(
-                                  controller: _controllers[index],
-                                  focusNode: _focusNodes[index],
-                                  keyboardType: TextInputType.number,
-                                  textAlign: TextAlign.center,
-                                  maxLength: 4,
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        color: AppColors.textPrimary,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    LengthLimitingTextInputFormatter(4),
-                                  ],
-                                  decoration: InputDecoration(
-                                    counterText: '',
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.zero,
-                                    hintText: '0',
-                                    hintStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                          color: AppColors.textMuted,
-                                        ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                      borderSide: const BorderSide(color: AppColors.border, width: 1.5),
-                                    ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Verify OTP',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Enter the 4-digit code sent to $_displayIdentifier',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      // 4 digits input Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: List.generate(4, (index) {
+                          return SizedBox(
+                            width: 56,
+                            height: 64,
+                            child: TextFormField(
+                              controller: _controllers[index],
+                              focusNode: _focusNodes[index],
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              maxLength: 4,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w800,
                                   ),
-                                  onChanged: (value) => _onChanged(value, index),
-                                ),
-                              );
-                            }),
-                          ),
-                          const SizedBox(height: 16),
-                          if (_verified)
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFECFDF5),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: const Color(0xFFBBF7D0)),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(Icons.verified_rounded, color: AppColors.success),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      'OTP verified successfully.',
-                                      style: TextStyle(
-                                        color: AppColors.success,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (_verified) const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (!_canResend) ...[
-                                const Icon(Icons.timer_outlined, size: 18, color: AppColors.textSecondary),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Resend in 0:${_secondsRemaining.toString().padLeft(2, '0')}',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: AppColors.textSecondary,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                              ] else ...[
-                                Text(
-                                  'Didn\'t get the code?',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                ),
-                                TextButton(
-                                  onPressed: _isLoading ? null : _resendOtp,
-                                  child: const Text('Resend OTP'),
-                                ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(4),
                               ],
+                              decoration: InputDecoration(
+                                counterText: '',
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: EdgeInsets.zero,
+                                hintText: '0',
+                                hintStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      color: AppColors.textMuted,
+                                    ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: AppColors.border, width: 1.5),
+                                ),
+                              ),
+                              onChanged: (value) => _onChanged(value, index),
+                            ),
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 20),
+                      if (_verified)
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.verified_rounded, color: AppColors.success),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'OTP verified successfully.',
+                                  style: TextStyle(
+                                    color: AppColors.success,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            height: 54,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _verifyOtp,
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                      ),
-                                    )
-                                  : const Text('Verify OTP'),
+                        ),
+                      if (_verified) const SizedBox(height: 16),
+                      // Resend Timer Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (!_canResend) ...[
+                            const Icon(Icons.timer_outlined, size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Resend in 0:${_secondsRemaining.toString().padLeft(2, '0')}',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          OutlinedButton(
-                            onPressed: _isLoading
-                                ? null
-                                : () {
-                                    Navigator.maybePop(context);
-                                  },
-                            child: const Text('Change mobile number'),
-                          ),
+                          ] else ...[
+                            Text(
+                              'Didn\'t get the code?',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                            ),
+                            TextButton(
+                              onPressed: _isLoading ? null : _resendOtp,
+                              child: const Text('Resend OTP'),
+                            ),
+                          ],
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 24),
+                      // Verify button
+                      SizedBox(
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _verifyOtp,
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text('Verify OTP'),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Change identifier option
+                      SizedBox(
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  Navigator.maybePop(context);
+                                },
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            side: const BorderSide(color: AppColors.border),
+                          ),
+                          child: const Text(
+                            'Change mobile number / email',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlowBlob extends StatelessWidget {
-  final Color color;
-  final double size;
-
-  const _GlowBlob({
-    required this.color,
-    required this.size,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
+        ],
       ),
     );
   }
