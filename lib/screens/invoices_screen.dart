@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
+import 'package:maharashtra_tyres/services/inventory_service.dart';
 import 'package:maharashtra_tyres/services/pdf_helper.dart';
 import 'package:maharashtra_tyres/screens/add_invoice_screen.dart';
 
@@ -485,7 +487,8 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     setState(() => _isPdfSharing = true);
 
-    final bytes = await InvoiceService.fetchInvoicePdfBytes(widget.invoice['id']);
+    final lang = LanguageService.currentLanguage.value;
+    final bytes = await InvoiceService.fetchInvoicePdfBytes(widget.invoice['id'], lang: lang);
 
     if (!mounted) return;
     setState(() => _isPdfSharing = false);
@@ -580,12 +583,12 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     final payload = Map<String, dynamic>.from(widget.invoice);
     payload['status'] = 'paid';
 
-    final success = await InvoiceService.updateInvoice(widget.invoice['id'], payload);
+    final result = await InvoiceService.updateInvoice(widget.invoice['id'], payload);
 
     if (!mounted) return;
     setState(() => _isMarkingPaid = false);
 
-    if (success) {
+    if (result['success'] == true) {
       scaffoldMessenger.showSnackBar(
         const SnackBar(
           content: Text('Invoice marked as paid successfully!'),
@@ -596,8 +599,8 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
       navigator.pop();
     } else {
       scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update invoice status.'),
+        SnackBar(
+          content: Text(result['message'] ?? 'Failed to update invoice status.'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -658,7 +661,8 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     setState(() => _isPdfDownloading = true);
 
-    final bytes = await InvoiceService.fetchInvoicePdfBytes(widget.invoice['id']);
+    final lang = LanguageService.currentLanguage.value;
+    final bytes = await InvoiceService.fetchInvoicePdfBytes(widget.invoice['id'], lang: lang);
 
     if (!mounted) return;
     setState(() => _isPdfDownloading = false);

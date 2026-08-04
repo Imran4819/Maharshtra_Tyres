@@ -66,7 +66,7 @@ class InvoiceService {
   }
 
   // Create invoice
-  static Future<bool> createInvoice(Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> createInvoice(Map<String, dynamic> payload) async {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
@@ -75,14 +75,18 @@ class InvoiceService {
         headers: headers,
         body: jsonEncode(payload),
       );
-      return response.statusCode == 200 || response.statusCode == 201;
+      final data = jsonDecode(response.body);
+      return {
+        'success': response.statusCode == 200 || response.statusCode == 201,
+        'message': data['message'] ?? 'Failed to create invoice.',
+      };
     } catch (e) {
-      return false;
+      return {'success': false, 'message': 'Connection error: $e'};
     }
   }
 
   // Update invoice
-  static Future<bool> updateInvoice(String id, Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> updateInvoice(String id, Map<String, dynamic> payload) async {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
@@ -91,9 +95,13 @@ class InvoiceService {
         headers: headers,
         body: jsonEncode(payload),
       );
-      return response.statusCode == 200 || response.statusCode == 201;
+      final data = jsonDecode(response.body);
+      return {
+        'success': response.statusCode == 200 || response.statusCode == 201,
+        'message': data['message'] ?? 'Failed to update invoice.',
+      };
     } catch (e) {
-      return false;
+      return {'success': false, 'message': 'Connection error: $e'};
     }
   }
 
@@ -113,12 +121,13 @@ class InvoiceService {
   }
 
   // Fetch Invoice PDF bytes
-  static Future<List<int>?> fetchInvoicePdfBytes(String id) async {
+  static Future<List<int>?> fetchInvoicePdfBytes(String id, {String? lang}) async {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
+      final queryParam = lang != null ? '?lang=$lang' : '';
       final response = await http.get(
-        Uri.parse('$url/$id/pdf'),
+        Uri.parse('$url/$id/pdf$queryParam'),
         headers: headers,
       );
       if (response.statusCode == 200) {

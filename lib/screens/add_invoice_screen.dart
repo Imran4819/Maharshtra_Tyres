@@ -127,6 +127,31 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
     }
   }
 
+  void _matchInvoiceItemsWithInventory() {
+    if (_inventoryItems.isEmpty || _items.isEmpty) return;
+    setState(() {
+      for (var item in _items) {
+        final desc = (item['description'] ?? '').toString().trim().toLowerCase();
+        final brand = (item['brand'] ?? '').toString().trim().toLowerCase();
+        
+        for (final inv in _inventoryItems) {
+          final pName = (inv['product_name'] ?? '').toString().trim().toLowerCase();
+          final size = (inv['size'] ?? '').toString().trim().toLowerCase();
+          final company = (inv['company'] ?? '').toString().trim().toLowerCase();
+          
+          final expectedDesc = size.isNotEmpty ? '$pName ($size)' : pName;
+          
+          if (desc == expectedDesc && brand == company) {
+            item['inventory_id'] = inv['id'];
+            item['available_stock'] = double.tryParse(inv['quantity'].toString()) ?? 0.0;
+            item['original_quantity'] = double.tryParse(item['quantity'].toString()) ?? 0.0;
+            break;
+          }
+        }
+      }
+    });
+  }
+
   Future<void> _loadInventory() async {
     setState(() => _isLoadingInventory = true);
     final list = await InventoryService.fetchInventory();
@@ -135,6 +160,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
         _inventoryItems = list;
         _isLoadingInventory = false;
       });
+      _matchInvoiceItemsWithInventory();
     }
   }
 
@@ -361,6 +387,9 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
         price = double.tryParse(inventoryItem['price'].toString()) ?? 0.0;
       }
 
+      final stock = double.tryParse(inventoryItem['quantity']?.toString() ?? '0') ?? 0.0;
+      final invId = inventoryItem['id'];
+
       if (itemIndex == -1) {
         // Append a new item row to the invoice
         _items.add({
@@ -368,6 +397,9 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
           'brand': brand,
           'quantity': 1.0,
           'price': price,
+          'inventory_id': invId,
+          'available_stock': stock,
+          'original_quantity': 0.0,
         });
         _descriptionControllers.add(TextEditingController(text: description));
         _brandControllers.add(TextEditingController(text: brand));
@@ -383,6 +415,8 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
 
         _priceControllers[itemIndex].text = price.toString();
         _items[itemIndex]['price'] = price;
+        _items[itemIndex]['inventory_id'] = invId;
+        _items[itemIndex]['available_stock'] = stock;
       }
     });
   }
@@ -659,6 +693,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
         'brand': item['brand']?.toString().trim() ?? '-',
         'quantity': double.tryParse(item['quantity'].toString()) ?? 1.0,
         'price': double.tryParse(item['price'].toString()) ?? 0.0,
+        if (item['inventory_id'] != null) 'inventory_id': item['inventory_id'],
       }).toList(),
       'subtotal': _subtotal,
       'tax': _tax,
@@ -667,17 +702,18 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
     };
 
-    bool success;
+    Map<String, dynamic> result;
     if (_isEdit) {
-      success = await InvoiceService.updateInvoice(widget.invoice!['id'], payload);
+      result = await InvoiceService.updateInvoice(widget.invoice!['id'], payload);
     } else {
-      success = await InvoiceService.createInvoice(payload);
+      result = await InvoiceService.createInvoice(payload);
     }
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (success) {
+    if (result['success'] == true) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.success,
@@ -693,7 +729,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Text('Failed to ${_isEdit ? 'update' : 'create'} invoice. Please check parameters.'),
+          content: Text(result['message'] ?? 'Failed to ${_isEdit ? 'update' : 'create'} invoice.'),
         ),
       );
     }
@@ -1096,6 +1132,21 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                   labelText: 'Qty',
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Req';
+                  final qty = double.tryParse(v);
+                  if (qty == null || qty <= 0) return 'Invalid';
+                  final invId = item['inventory_id'];
+                  if (invId != null) {
+                    final availableStock = double.tryParse(item['available_stock']?.toString() ?? '0') ?? 0.0;
+                    final originalQty = double.tryParse(item['original_quantity']?.toString() ?? '0') ?? 0.0;
+                    final maxAllowed = availableStock + originalQty;
+                    if (qty > maxAllowed) {
+                      return 'Max ${maxAllowed.toStringAsFixed(0)}';
+                    }
+                  }
+                  return null;
+                },
                 onChanged: (v) {
                   setState(() {
                     item['quantity'] = double.tryParse(v) ?? 1.0;
