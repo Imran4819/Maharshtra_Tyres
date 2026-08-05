@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
-import 'package:maharashtra_tyres/services/inventory_service.dart';
 import 'package:maharashtra_tyres/services/pdf_helper.dart';
 import 'package:maharashtra_tyres/screens/add_invoice_screen.dart';
 
@@ -411,7 +410,12 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                         children: [
                           const Icon(Icons.calendar_today_outlined, size: 11, color: AppColors.textSecondary),
                           const SizedBox(width: 4),
-                          Text(inv['due_date'] ?? 'No Due Date', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                          Text(
+                            (inv['due_date'] != null && inv['due_date'].toString().trim().isNotEmpty)
+                                ? inv['due_date'].toString()
+                                : 'No Due Date',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
                         ],
                       ),
                     ],
@@ -493,15 +497,21 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     if (!mounted) return;
     setState(() => _isPdfSharing = false);
 
-    if (bytes != null) {
+    if (bytes != null && bytes.isNotEmpty) {
       final filename = '${widget.invoice['invoice_number'] ?? 'invoice'}.pdf';
       final customerName = widget.invoice['customer_name'] ?? 'Customer';
       final invoiceNum = widget.invoice['invoice_number'] ?? 'Invoice';
+      final phone = widget.invoice['customer_phone']?.toString() ?? '';
       
+      if (phone.trim().isNotEmpty) {
+        final cleanPhone = _formatPhoneNumber(phone);
+        await Clipboard.setData(ClipboardData(text: cleanPhone));
+      }
+
       await sharePdf(
         bytes,
         filename,
-        text: 'Invoice $invoiceNum for $customerName',
+        text: 'Invoice $invoiceNum for $customerName${phone.trim().isNotEmpty ? ' (${_formatPhoneNumber(phone)})' : ''}',
       );
     } else {
       scaffoldMessenger.showSnackBar(
@@ -528,39 +538,61 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     }
 
     final cleanPhone = _formatPhoneNumber(phone);
+    await Clipboard.setData(ClipboardData(text: cleanPhone));
+
     final customerName = widget.invoice['customer_name'] ?? 'Customer';
     final invoiceNum = widget.invoice['invoice_number'] ?? 'Invoice';
     final total = widget.invoice['total'] ?? '0.00';
-    final dueDate = widget.invoice['due_date'] ?? 'N/A';
+    final rawDueDate = widget.invoice['due_date']?.toString().trim();
+    final hasDueDate = rawDueDate != null && rawDueDate.isNotEmpty && rawDueDate != 'N/A';
 
     final message = 'Hello $customerName,\n\n'
         'Your invoice *$invoiceNum* is ready.\n'
         'Total Amount: *₹$total*\n'
-        'Due Date: *$dueDate*\n\n'
+        '${hasDueDate ? 'Due Date: *$rawDueDate*\n' : ''}\n'
         'Thank you for your business!\n'
         'Maharashtra Tyres';
 
-    final encodedMessage = Uri.encodeComponent(message);
-    final url = Uri.parse('https://wa.me/$cleanPhone?text=$encodedMessage');
+    setState(() => _isPdfSharing = true);
+    final lang = LanguageService.currentLanguage.value;
+    final bytes = await InvoiceService.fetchInvoicePdfBytes(widget.invoice['id'], lang: lang);
+    if (!mounted) return;
+    setState(() => _isPdfSharing = false);
 
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
+    if (bytes != null && bytes.isNotEmpty) {
+      final filename = '${widget.invoice['invoice_number'] ?? 'invoice'}.pdf';
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Sharing PDF for $cleanPhone (Phone number copied to clipboard)'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      await sharePdf(bytes, filename, text: message);
+    } else {
+      // Fallback to text WhatsApp link if PDF fetch fails
+      final encodedMessage = Uri.encodeComponent(message);
+      final url = Uri.parse('https://wa.me/$cleanPhone?text=$encodedMessage');
+
+      try {
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } else {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text('Could not launch WhatsApp.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      } catch (e) {
         scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('Could not launch WhatsApp.'),
+          SnackBar(
+            content: Text('Error launching WhatsApp: $e'),
             backgroundColor: AppColors.error,
           ),
         );
       }
-    } catch (e) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Error launching WhatsApp: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
     }
   }
 
@@ -667,9 +699,9 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     if (!mounted) return;
     setState(() => _isPdfDownloading = false);
 
-    if (bytes != null) {
+    if (bytes != null && bytes.isNotEmpty) {
       final filename = '${widget.invoice['invoice_number'] ?? 'invoice'}.pdf';
-      saveAndOpenPdf(bytes, filename);
+      await saveAndOpenPdf(bytes, filename);
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text('PDF $filename generated successfully.'),
@@ -772,7 +804,21 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
               children: [
                 _sheetRow(Icons.phone_outlined, 'Customer Phone', widget.invoice['customer_phone'] ?? 'N/A'),
                 _sheetRow(Icons.email_outlined, 'Customer Email', widget.invoice['customer_email'] ?? 'N/A'),
-                _sheetRow(Icons.calendar_today_outlined, 'Due Date', widget.invoice['due_date'] ?? 'N/A'),
+                if (widget.invoice['due_date'] != null &&
+                    widget.invoice['due_date'].toString().trim().isNotEmpty &&
+                    widget.invoice['due_date'].toString().trim() != 'N/A')
+                  _sheetRow(
+                    Icons.calendar_today_outlined,
+                    'Due Date',
+                    widget.invoice['due_date'].toString(),
+                  ),
+                if (double.tryParse(widget.invoice['labour_charge']?.toString() ?? widget.invoice['labor_charge']?.toString() ?? '0') != null &&
+                    (double.tryParse(widget.invoice['labour_charge']?.toString() ?? widget.invoice['labor_charge']?.toString() ?? '0') ?? 0) > 0)
+                  _sheetRow(
+                    Icons.engineering_outlined,
+                    'Labour Charge',
+                    '₹${(double.tryParse(widget.invoice['labour_charge']?.toString() ?? widget.invoice['labor_charge']?.toString() ?? '0') ?? 0).toStringAsFixed(2)}',
+                  ),
                 _sheetRow(Icons.info_outline_rounded, 'Status', status.toUpperCase()),
                 _sheetRow(Icons.notes_rounded, 'Notes', widget.invoice['notes'] ?? 'N/A'),
               ],

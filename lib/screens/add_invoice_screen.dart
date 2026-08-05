@@ -27,7 +27,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
   late final TextEditingController _vehicleNoController;
   late final TextEditingController _dateController;
   late final TextEditingController _dueDateController;
-  late final TextEditingController _taxController;
+  late final TextEditingController _labourChargeController;
   late final TextEditingController _discountController;
   late final TextEditingController _notesController;
 
@@ -59,9 +59,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
   @override
   void initState() {
     super.initState();
-    final defaultInvoiceNum = 'INV-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
-    
-    _invoiceNumberController = TextEditingController(text: widget.invoice?['invoice_number'] ?? defaultInvoiceNum);
+    _invoiceNumberController = TextEditingController(text: widget.invoice?['invoice_number'] ?? '');
     _customerNameController = TextEditingController(text: widget.invoice?['customer_name'] ?? '');
     _customerEmailController = TextEditingController(text: widget.invoice?['customer_email'] ?? '');
     _customerPhoneController = TextEditingController(text: widget.invoice?['customer_phone'] ?? '');
@@ -72,12 +70,10 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
     final todayStr = "${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
     _dateController = TextEditingController(text: widget.invoice?['date'] ?? todayStr);
 
-    // Default due date to 30 days from now if not editing
-    final defaultDueDate = DateTime.now().add(const Duration(days: 30));
-    final defaultDueDateStr = "${defaultDueDate.year.toString().padLeft(4, '0')}-${defaultDueDate.month.toString().padLeft(2, '0')}-${defaultDueDate.day.toString().padLeft(2, '0')}";
-    _dueDateController = TextEditingController(text: widget.invoice?['due_date'] ?? defaultDueDateStr);
+    // Due date is optional and not filled automatically
+    _dueDateController = TextEditingController(text: widget.invoice?['due_date']?.toString() ?? '');
     
-    _taxController = TextEditingController(text: widget.invoice?['tax']?.toString() ?? '0.0');
+    _labourChargeController = TextEditingController(text: widget.invoice?['labour_charge']?.toString() ?? widget.invoice?['labor_charge']?.toString() ?? '0.0');
     _discountController = TextEditingController(text: widget.invoice?['discount']?.toString() ?? '0.0');
     _notesController = TextEditingController(text: widget.invoice?['notes'] ?? 'Thank you for your business!');
     _status = widget.invoice?['status'] ?? 'pending';
@@ -103,17 +99,22 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
         _quantityControllers.add(TextEditingController(text: qty.toString()));
         _priceControllers.add(TextEditingController(text: price.toString()));
       }
-    } else {
-      // Add one default item to start with
-      _items.add({'description': 'MRF ZLX 165/80 R14', 'brand': 'MRF', 'quantity': 1, 'price': 4500.0});
-      _descriptionControllers.add(TextEditingController(text: 'MRF ZLX 165/80 R14'));
-      _brandControllers.add(TextEditingController(text: 'MRF'));
-      _quantityControllers.add(TextEditingController(text: '1'));
-      _priceControllers.add(TextEditingController(text: '4500.0'));
     }
 
     _loadCustomers();
     _loadInventory();
+    _loadNextInvoiceNumber();
+  }
+
+  Future<void> _loadNextInvoiceNumber() async {
+    if (!_isEdit && _invoiceNumberController.text.trim().isEmpty) {
+      final nextNum = await InvoiceService.fetchNextInvoiceNumber();
+      if (mounted && !_isEdit && _invoiceNumberController.text.trim().isEmpty) {
+        setState(() {
+          _invoiceNumberController.text = nextNum;
+        });
+      }
+    }
   }
 
   Future<void> _loadCustomers() async {
@@ -185,7 +186,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
     _vehicleNoController.dispose();
     _dateController.dispose();
     _dueDateController.dispose();
-    _taxController.dispose();
+    _labourChargeController.dispose();
     _discountController.dispose();
     _notesController.dispose();
     for (final c in _descriptionControllers) {
@@ -213,14 +214,18 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
     return sum;
   }
 
-  double get _tax => double.tryParse(_taxController.text) ?? 0.0;
+  double get _tax => 0.0;
+  double get _labourCharge => double.tryParse(_labourChargeController.text) ?? 0.0;
   double get _discount => double.tryParse(_discountController.text) ?? 0.0;
-  double get _total => _subtotal + _tax - _discount;
+  double get _total => _subtotal + _labourCharge - _discount;
 
   Future<void> _selectDueDate(BuildContext context) async {
+    final initial = _dueDateController.text.trim().isNotEmpty
+        ? (DateTime.tryParse(_dueDateController.text.trim()) ?? DateTime.now().add(const Duration(days: 30)))
+        : DateTime.now().add(const Duration(days: 30));
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)),
+      initialDate: initial,
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
@@ -615,25 +620,19 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
   }
 
   void _removeItem(int index) {
-    if (_items.length > 1) {
-      setState(() {
-        _descriptionControllers[index].dispose();
-        _brandControllers[index].dispose();
-        _quantityControllers[index].dispose();
-        _priceControllers[index].dispose();
-        
-        _descriptionControllers.removeAt(index);
-        _brandControllers.removeAt(index);
-        _quantityControllers.removeAt(index);
-        _priceControllers.removeAt(index);
-        
-        _items.removeAt(index);
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('At least one item is required in the invoice.')),
-      );
-    }
+    setState(() {
+      _descriptionControllers[index].dispose();
+      _brandControllers[index].dispose();
+      _quantityControllers[index].dispose();
+      _priceControllers[index].dispose();
+      
+      _descriptionControllers.removeAt(index);
+      _brandControllers.removeAt(index);
+      _quantityControllers.removeAt(index);
+      _priceControllers.removeAt(index);
+      
+      _items.removeAt(index);
+    });
   }
 
   Future<void> _saveInvoice() async {
@@ -686,7 +685,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       'customer_address': _customerAddressController.text.trim(),
       'vehicle_no': _vehicleNoController.text.trim(),
       'date': _dateController.text.trim(),
-      'due_date': _dueDateController.text.trim(),
+      'due_date': _dueDateController.text.trim().isEmpty ? null : _dueDateController.text.trim(),
       'status': _status,
       'items': _items.map((item) => {
         'description': item['description']?.toString().trim() ?? '',
@@ -697,6 +696,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       }).toList(),
       'subtotal': _subtotal,
       'tax': _tax,
+      'labour_charge': _labourCharge,
       'discount': _discount,
       'total': _total,
       'notes': _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
@@ -798,7 +798,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                                 ),
                                 Switch(
                                   value: _isManualCustomer,
-                                  activeColor: AppColors.primary,
+                                  activeThumbColor: AppColors.primary,
                                   onChanged: (v) {
                                     setState(() {
                                       _isManualCustomer = v;
@@ -869,26 +869,65 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                           iconColor: const Color(0xFF8B5CF6),
                           iconBg: const Color(0xFFF5F3FF),
                           children: [
-                            ListView.separated(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: _items.length,
-                              separatorBuilder: (context, index) => const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 8),
-                                child: Divider(height: 1, color: AppColors.border),
+                            if (_items.isEmpty)
+                              InkWell(
+                                onTap: _addItem,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.primaryLight,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.add_shopping_cart_rounded, color: AppColors.primary, size: 24),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const Text(
+                                        'Select Product from Inventory',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'Tap here to browse stock or add custom item',
+                                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else ...[
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _items.length,
+                                separatorBuilder: (context, index) => const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: Divider(height: 1, color: AppColors.border),
+                                ),
+                                itemBuilder: (context, index) => _buildItemRow(index),
                               ),
-                              itemBuilder: (context, index) => _buildItemRow(index),
-                            ),
-                            const SizedBox(height: 16),
-                            OutlinedButton.icon(
-                              onPressed: _addItem,
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Add Item'),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.primary),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: _addItem,
+                                icon: const Icon(Icons.add_rounded),
+                                label: const Text('Add Another Item'),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: AppColors.primary),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -903,10 +942,10 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                             _buildSummaryRow('Subtotal', '₹${_subtotal.toStringAsFixed(2)}'),
                             const SizedBox(height: 16),
                             _buildField(
-                              controller: _taxController,
-                              label: 'Tax (₹)',
+                              controller: _labourChargeController,
+                              label: 'Labour Charge (₹)',
                               hint: '0.00',
-                              icon: Icons.receipt_outlined,
+                              icon: Icons.engineering_outlined,
                               keyboardType: TextInputType.number,
                               onChanged: (_) => setState(() {}),
                             ),
@@ -920,6 +959,14 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                               onChanged: (_) => setState(() {}),
                             ),
                             const Divider(height: 32, thickness: 1.5, color: AppColors.border),
+                            if (_labourCharge > 0) ...[
+                              _buildSummaryRow(
+                                'Labour Charge',
+                                '+ ₹${_labourCharge.toStringAsFixed(2)}',
+                                textColor: AppColors.primary,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             _buildSummaryRow(
                               'Grand Total',
                               '₹${_total.toStringAsFixed(2)}',
@@ -1290,6 +1337,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
   }
 
   Widget _buildDateField() {
+    final hasDueDate = _dueDateController.text.trim().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1311,15 +1359,30 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
           onTap: () => _selectDueDate(context),
           style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
-            hintText: 'YYYY-MM-DD',
+            hintText: 'Select Due Date (Optional)',
             hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.all(12),
-              child: const Icon(Icons.calendar_today_rounded, color: AppColors.textSecondary, size: 20),
+            prefixIcon: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Icon(Icons.calendar_today_rounded, color: AppColors.textSecondary, size: 20),
             ),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.date_range_rounded, color: AppColors.primary),
-              onPressed: () => _selectDueDate(context),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (hasDueDate)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
+                    onPressed: () {
+                      setState(() {
+                        _dueDateController.clear();
+                      });
+                    },
+                    tooltip: 'Clear Due Date',
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.date_range_rounded, color: AppColors.primary),
+                  onPressed: () => _selectDueDate(context),
+                ),
+              ],
             ),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),

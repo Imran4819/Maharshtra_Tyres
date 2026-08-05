@@ -78,6 +78,30 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
   Future<void> _saveItem() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final qty = double.tryParse(_quantityController.text.trim()) ?? 0.0;
+    if (_status == 'inactive' && qty > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: const Row(
+            children: [
+              Icon(Icons.error_outline_rounded, color: Colors.white),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Cannot set product status to Inactive while stock is available (> 0).',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     bool success;
@@ -396,7 +420,32 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
           ),
           Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _status = 'inactive'),
+              onTap: () {
+                final qty = double.tryParse(_quantityController.text.trim()) ?? 0.0;
+                if (qty > 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      content: const Row(
+                        children: [
+                          Icon(Icons.error_outline_rounded, color: Colors.white),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Cannot set status to Inactive while stock is available (> 0).',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  return;
+                }
+                setState(() => _status = 'inactive');
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 12),

@@ -3,7 +3,7 @@ import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:share_plus/share_plus.dart';
 
-void saveAndOpenPdf(List<int> bytes, String filename) {
+Future<void> saveAndOpenPdf(List<int> bytes, String filename) async {
   final blob = html.Blob([bytes], 'application/pdf');
   final url = html.Url.createObjectUrlFromBlob(blob);
   

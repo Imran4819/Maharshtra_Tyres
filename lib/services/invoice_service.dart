@@ -65,6 +65,32 @@ class InvoiceService {
     }
   }
 
+  // Fetch next sequential invoice number (1, 2, 3, 4, 5...)
+  static Future<String> fetchNextInvoiceNumber() async {
+    try {
+      final invoices = await fetchInvoices();
+      int maxNum = 0;
+      for (final inv in invoices) {
+        final numStr = inv['invoice_number']?.toString().trim() ?? '';
+        final directVal = int.tryParse(numStr);
+        if (directVal != null && directVal > 0 && directVal < 10000) {
+          if (directVal > maxNum) maxNum = directVal;
+        } else {
+          final digitsOnly = numStr.replaceAll(RegExp(r'\D'), '');
+          if (digitsOnly.isNotEmpty) {
+            final parsed = int.tryParse(digitsOnly) ?? 0;
+            if (parsed > 0 && parsed < 10000 && parsed > maxNum) {
+              maxNum = parsed;
+            }
+          }
+        }
+      }
+      return (maxNum + 1).toString();
+    } catch (_) {
+      return '1';
+    }
+  }
+
   // Create invoice
   static Future<Map<String, dynamic>> createInvoice(Map<String, dynamic> payload) async {
     try {
