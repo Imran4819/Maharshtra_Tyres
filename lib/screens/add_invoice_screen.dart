@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
 import 'package:maharashtra_tyres/services/customer_service.dart';
 import 'package:maharashtra_tyres/services/inventory_service.dart';
 import 'package:maharashtra_tyres/screens/add_inventory_screen.dart';
+import 'package:maharashtra_tyres/widgets/custom_snackbar.dart';
 
 class AddInvoiceScreen extends StatefulWidget {
   const AddInvoiceScreen({super.key, this.invoice});
@@ -714,23 +716,17 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
 
     if (result['success'] == true) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Text('Invoice ${_isEdit ? 'updated' : 'generated'} successfully!'),
-        ),
+      showAppSnackBar(
+        context,
+        'Invoice ${_isEdit ? 'updated' : 'generated'} successfully!',
+        type: SnackBarType.success,
       );
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Text(result['message'] ?? 'Failed to ${_isEdit ? 'update' : 'create'} invoice.'),
-        ),
+      showAppSnackBar(
+        context,
+        result['message'] ?? 'Failed to ${_isEdit ? 'update' : 'create'} invoice.',
+        type: SnackBarType.error,
       );
     }
   }
@@ -740,7 +736,8 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
     final size = MediaQuery.sizeOf(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.getScaffoldBg(context),
+      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           _buildTopBar(context),
@@ -782,16 +779,16 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Row(
+                                Row(
                                   children: [
-                                    Icon(Icons.person_add_rounded, size: 18, color: AppColors.primary),
-                                    SizedBox(width: 8),
+                                    const Icon(Icons.person_add_rounded, size: 18, color: AppColors.primary),
+                                    const SizedBox(width: 8),
                                     Text(
                                       'New Customer / Enter Manually',
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
-                                        color: AppColors.textPrimary,
+                                        color: AppColors.getTextPrimary(context),
                                       ),
                                     ),
                                   ],
@@ -866,8 +863,8 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                         _buildSectionCard(
                           title: 'Invoice Items',
                           icon: Icons.shopping_bag_outlined,
-                          iconColor: const Color(0xFF8B5CF6),
-                          iconBg: const Color(0xFFF5F3FF),
+                          iconColor: AppColors.accent,
+                          iconBg: AppColors.accent.withValues(alpha: 0.15),
                           children: [
                             if (_items.isEmpty)
                               InkWell(
@@ -877,7 +874,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                                   width: double.infinity,
                                   padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
+                                    color: AppColors.getScaffoldBg(context),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                                   ),
@@ -898,9 +895,9 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
                                       ),
                                       const SizedBox(height: 4),
-                                      const Text(
+                                      Text(
                                         'Tap here to browse stock or add custom item',
-                                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                        style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context)),
                                       ),
                                     ],
                                   ),
@@ -911,9 +908,9 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 itemCount: _items.length,
-                                separatorBuilder: (context, index) => const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 8),
-                                  child: Divider(height: 1, color: AppColors.border),
+                                separatorBuilder: (context, index) => Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Divider(height: 1, color: AppColors.getBorder(context)),
                                 ),
                                 itemBuilder: (context, index) => _buildItemRow(index),
                               ),
@@ -937,7 +934,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                           title: 'Financial Summary',
                           icon: Icons.currency_rupee_rounded,
                           iconColor: const Color(0xFF10B981),
-                          iconBg: const Color(0xFFECFDF5),
+                          iconBg: const Color(0xFF10B981).withValues(alpha: 0.15),
                           children: [
                             _buildSummaryRow('Subtotal', '₹${_subtotal.toStringAsFixed(2)}'),
                             const SizedBox(height: 16),
@@ -958,7 +955,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                               keyboardType: TextInputType.number,
                               onChanged: (_) => setState(() {}),
                             ),
-                            const Divider(height: 32, thickness: 1.5, color: AppColors.border),
+                            Divider(height: 32, thickness: 1.5, color: AppColors.getBorder(context)),
                             if (_labourCharge > 0) ...[
                               _buildSummaryRow(
                                 'Labour Charge',
@@ -982,7 +979,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                           title: 'Notes',
                           icon: Icons.note_alt_outlined,
                           iconColor: const Color(0xFFF59E0B),
-                          iconBg: const Color(0xFFFEF3C7),
+                          iconBg: const Color(0xFFF59E0B).withValues(alpha: 0.15),
                           children: [
                             _buildField(
                               controller: _notesController,
@@ -1008,13 +1005,13 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.border, width: 1.5),
+                              side: BorderSide(color: AppColors.getBorder(context), width: 1.5),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Cancel',
                               style: TextStyle(
-                                color: AppColors.textSecondary,
+                                color: AppColors.getTextSecondary(context),
                                 fontWeight: FontWeight.w600,
                                 fontSize: 15,
                               ),
@@ -1044,17 +1041,14 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+          colors: [Color(0xFF073822), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
+          const AppSidebarButton(),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1065,7 +1059,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                 ),
                 Text(
                   _isEdit ? 'Update details of this invoice' : 'Generate a new invoice for client',
-                  style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12),
+                  style: const TextStyle(color: Color(0xFFE6F4EA), fontSize: 12),
                 ),
               ],
             ),
@@ -1079,9 +1073,9 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
       ),
       child: Row(
         children: [
@@ -1109,7 +1103,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
             child: Text(
               value.toUpperCase(),
               style: TextStyle(
-                color: selected ? Colors.white : AppColors.textSecondary,
+                color: selected ? Colors.white : AppColors.getTextSecondary(context),
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
               ),
@@ -1241,7 +1235,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
         Text(
           label,
           style: TextStyle(
-            color: AppColors.textSecondary,
+            color: AppColors.getTextSecondary(context),
             fontSize: isBold ? 15 : 13,
             fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
           ),
@@ -1249,7 +1243,7 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
         Text(
           value,
           style: TextStyle(
-            color: textColor ?? AppColors.textPrimary,
+            color: textColor ?? AppColors.getTextPrimary(context),
             fontSize: isBold ? 17 : 14,
             fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
           ),
@@ -1277,13 +1271,13 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       children: [
         Row(
           children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)),
+            Text(label, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.getTextPrimary(context))),
             if (isOptional) ...[
               const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                child: const Text('Optional', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                decoration: BoxDecoration(color: AppColors.getBorder(context).withValues(alpha: 0.3), borderRadius: BorderRadius.circular(4)),
+                child: Text('Optional', style: TextStyle(fontSize: 10, color: AppColors.getTextSecondary(context))),
               ),
             ],
           ],
@@ -1302,13 +1296,13 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
               extentOffset: controller.text.length,
             );
           },
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+          style: TextStyle(color: AppColors.getTextPrimary(context), fontSize: 14, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7), fontSize: 13),
             prefixIcon: Padding(
               padding: const EdgeInsets.all(12),
-              child: Icon(icon, color: AppColors.textSecondary, size: 20),
+              child: Icon(icon, color: AppColors.getTextSecondary(context), size: 20),
             ),
             suffixIcon: suffixIcon,
             suffixIconConstraints: const BoxConstraints(
@@ -1316,15 +1310,15 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
               minHeight: 40,
             ),
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: AppColors.getScaffoldBg(context),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.getBorder(context)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.getBorder(context)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1343,12 +1337,12 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       children: [
         Row(
           children: [
-            const Text('Due Date', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)),
+            Text('Due Date', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.getTextPrimary(context))),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-              child: const Text('Optional', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+              decoration: BoxDecoration(color: AppColors.getBorder(context).withValues(alpha: 0.3), borderRadius: BorderRadius.circular(4)),
+              child: Text('Optional', style: TextStyle(fontSize: 10, color: AppColors.getTextSecondary(context))),
             ),
           ],
         ),
@@ -1357,20 +1351,20 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
           controller: _dueDateController,
           readOnly: true,
           onTap: () => _selectDueDate(context),
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+          style: TextStyle(color: AppColors.getTextPrimary(context), fontSize: 14, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             hintText: 'Select Due Date (Optional)',
-            hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-            prefixIcon: const Padding(
-              padding: EdgeInsets.all(12),
-              child: Icon(Icons.calendar_today_rounded, color: AppColors.textSecondary, size: 20),
+            hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7), fontSize: 13),
+            prefixIcon: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Icon(Icons.calendar_today_rounded, color: AppColors.getTextSecondary(context), size: 20),
             ),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (hasDueDate)
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
+                    icon: Icon(Icons.close_rounded, color: AppColors.getTextSecondary(context), size: 18),
                     onPressed: () {
                       setState(() {
                         _dueDateController.clear();
@@ -1385,15 +1379,15 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
               ],
             ),
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: AppColors.getScaffoldBg(context),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.getBorder(context)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.getBorder(context)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1411,12 +1405,12 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       children: [
         Row(
           children: [
-            const Text('Invoice Date', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary)),
+            Text('Invoice Date', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.getTextPrimary(context))),
             const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-              child: const Text('Optional', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+              decoration: BoxDecoration(color: AppColors.getBorder(context).withValues(alpha: 0.3), borderRadius: BorderRadius.circular(4)),
+              child: Text('Optional', style: TextStyle(fontSize: 10, color: AppColors.getTextSecondary(context))),
             ),
           ],
         ),
@@ -1425,28 +1419,28 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
           controller: _dateController,
           readOnly: true,
           onTap: () => _selectInvoiceDate(context),
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+          style: TextStyle(color: AppColors.getTextPrimary(context), fontSize: 14, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             hintText: 'YYYY-MM-DD',
-            hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7), fontSize: 13),
             prefixIcon: Padding(
               padding: const EdgeInsets.all(12),
-              child: const Icon(Icons.calendar_today_rounded, color: AppColors.textSecondary, size: 20),
+              child: Icon(Icons.calendar_today_rounded, color: AppColors.getTextSecondary(context), size: 20),
             ),
             suffixIcon: IconButton(
               icon: const Icon(Icons.date_range_rounded, color: AppColors.primary),
               onPressed: () => _selectInvoiceDate(context),
             ),
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: AppColors.getScaffoldBg(context),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.getBorder(context)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
+              borderSide: BorderSide(color: AppColors.getBorder(context)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -1469,9 +1463,9 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4)),
         ],
@@ -1488,11 +1482,11 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
                 child: Icon(icon, color: iconColor, size: 18),
               ),
               const SizedBox(width: 10),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.getTextPrimary(context))),
             ],
           ),
           const SizedBox(height: 6),
-          const Divider(color: AppColors.border, height: 20),
+          Divider(color: AppColors.getBorder(context), height: 20),
           ...children,
         ],
       ),
@@ -1527,3 +1521,4 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
     );
   }
 }
+

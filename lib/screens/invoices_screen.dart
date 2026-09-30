@@ -6,6 +6,8 @@ import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
 import 'package:maharashtra_tyres/services/pdf_helper.dart';
 import 'package:maharashtra_tyres/screens/add_invoice_screen.dart';
+import 'package:maharashtra_tyres/widgets/custom_snackbar.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 
 class InvoicesScreen extends StatefulWidget {
   const InvoicesScreen({super.key});
@@ -81,7 +83,8 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
       valueListenable: LanguageService.currentLanguage,
       builder: (context, currentLang, child) {
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: AppColors.getScaffoldBg(context),
+          drawer: const AppSidebarDrawer(),
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppColors.primary,
             onPressed: () async {
@@ -137,29 +140,22 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         ),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+            colors: [Color(0xFF073822), Color(0xFF0F5132)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: Row(
           children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-              onPressed: () => Navigator.pop(context),
-            ),
+            const AppSidebarButton(),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(LanguageService.tr('invoices'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-                  Text(LanguageService.tr('all_invoices'), style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12)),
+                  Text(LanguageService.tr('all_invoices'), style: const TextStyle(color: Color(0xFFE6F4EA), fontSize: 12)),
                 ],
               ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-              onPressed: _loadInvoices,
             ),
           ],
         ),
@@ -170,10 +166,10 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final pendingCount = _invoices.where((i) => i['status']?.toString().toLowerCase() == 'pending').length;
 
     final stats = [
-      _Stat('Total Invoices', '${_invoices.length}', Icons.receipt_long_rounded, const Color(0xFF2563EB), const Color(0xFFEFF6FF)),
-      _Stat('Paid', '$paidCount', Icons.check_circle_outline_rounded, const Color(0xFF10B981), const Color(0xFFECFDF5)),
-      _Stat('Pending', '$pendingCount', Icons.hourglass_top_rounded, const Color(0xFFF59E0B), const Color(0xFFFEF3C7)),
-      _Stat('Revenue', '₹${(_totalRevenue / 1000).toStringAsFixed(1)}K', Icons.currency_rupee_rounded, const Color(0xFF8B5CF6), const Color(0xFFF5F3FF)),
+      _Stat('Total Invoices', '${_invoices.length}', Icons.receipt_long_rounded, AppColors.primary, AppColors.primaryLight),
+      _Stat('Paid', '$paidCount', Icons.check_circle_outline_rounded, const Color(0xFF10B981), const Color(0xFF10B981).withValues(alpha: 0.15)),
+      _Stat('Pending', '$pendingCount', Icons.hourglass_top_rounded, const Color(0xFFF59E0B), const Color(0xFFF59E0B).withValues(alpha: 0.15)),
+      _Stat('Revenue', '₹${(_totalRevenue / 1000).toStringAsFixed(1)}K', Icons.currency_rupee_rounded, AppColors.accent, AppColors.accent.withValues(alpha: 0.15)),
     ];
 
     return LayoutBuilder(builder: (_, c) {
@@ -182,7 +178,8 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         crossAxisCount: cols,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: cols == 4 ? 1.8 : 1.6,
+        // Keep enough vertical room for the icon, value, and label on narrow screens.
+        childAspectRatio: 1.4,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         children: stats.map((s) => _statCard(s)).toList(),
@@ -193,9 +190,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   Widget _statCard(_Stat s) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.getSurfaceCard(context),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.getBorder(context)),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
           ],
@@ -214,7 +211,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(s.value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: s.iconColor)),
-                Text(s.label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                Text(s.label, style: TextStyle(fontSize: 11, color: AppColors.getTextSecondary(context), fontWeight: FontWeight.w500)),
               ],
             ),
           ],
@@ -225,9 +222,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.getSurfaceCard(context),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.getBorder(context)),
               boxShadow: [
                 BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
               ],
@@ -235,14 +232,14 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             child: TextField(
               controller: _searchController,
               onChanged: (v) => setState(() => _searchQuery = v),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              style: TextStyle(color: AppColors.getTextPrimary(context), fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Search by invoice no. or customer...',
-                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
+                hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7), fontSize: 13),
+                prefixIcon: Icon(Icons.search_rounded, color: AppColors.getTextSecondary(context), size: 20),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
+                        icon: Icon(Icons.close_rounded, color: AppColors.getTextSecondary(context), size: 18),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -272,17 +269,17 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                       duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        gradient: sel ? const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF7C3AED)]) : null,
-                        color: sel ? null : Colors.white,
+                        gradient: sel ? const LinearGradient(colors: [Color(0xFF0F5132), Color(0xFF10B981)]) : null,
+                        color: sel ? null : AppColors.getSurfaceCard(context),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: sel ? Colors.transparent : AppColors.border),
+                        border: Border.all(color: sel ? Colors.transparent : AppColors.getBorder(context)),
                       ),
                       child: Text(
                         f,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: sel ? Colors.white : AppColors.textSecondary,
+                          color: sel ? Colors.white : AppColors.getTextSecondary(context),
                         ),
                       ),
                     ),
@@ -304,7 +301,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             '${list.length} invoice${list.length == 1 ? '' : 's'} found',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 13, color: AppColors.getTextSecondary(context), fontWeight: FontWeight.w500),
           ),
         ),
         ListView.separated(
@@ -326,10 +323,10 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             ? const Color(0xFFD97706)
             : const Color(0xFFDC2626);
     final Color statusBg = status == 'paid'
-        ? const Color(0xFFECFDF5)
+        ? const Color(0xFF10B981).withValues(alpha: 0.15)
         : status == 'pending'
-            ? const Color(0xFFFEF3C7)
-            : const Color(0xFFFEF2F2);
+            ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+            : const Color(0xFFEF4444).withValues(alpha: 0.15);
 
     final String initials = inv['customer_name'] != null && inv['customer_name'].toString().isNotEmpty
         ? inv['customer_name'].toString().substring(0, 1).toUpperCase()
@@ -339,9 +336,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
         ],
@@ -361,7 +358,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                   height: 46,
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                      colors: [Color(0xFF073822), Color(0xFF0F5132)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -403,18 +400,22 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                       const SizedBox(height: 6),
                       Text(
                         inv['customer_name'] ?? 'Unnamed Customer',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.getTextPrimary(context)),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today_outlined, size: 11, color: AppColors.textSecondary),
+                          Icon(Icons.calendar_today_outlined, size: 11, color: AppColors.getTextSecondary(context)),
                           const SizedBox(width: 4),
-                          Text(
-                            (inv['due_date'] != null && inv['due_date'].toString().trim().isNotEmpty)
-                                ? inv['due_date'].toString()
-                                : 'No Due Date',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          Expanded(
+                            child: Text(
+                              (inv['due_date'] != null && inv['due_date'].toString().trim().isNotEmpty)
+                                  ? inv['due_date'].toString().split('T').first
+                                  : 'No Due Date',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: AppColors.getTextSecondary(context)),
+                            ),
                           ),
                         ],
                       ),
@@ -425,9 +426,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('₹${totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+                    Text('₹${totalAmount.toStringAsFixed(2)}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.getTextPrimary(context))),
                     const SizedBox(height: 4),
-                    const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 18),
+                    Icon(Icons.chevron_right_rounded, color: AppColors.getTextSecondary(context), size: 18),
                   ],
                 ),
               ],
@@ -446,13 +447,13 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
               Container(
                 width: 80,
                 height: 80,
-                decoration: BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+                decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
                 child: const Icon(Icons.receipt_long_outlined, size: 40, color: AppColors.primary),
               ),
               const SizedBox(height: 16),
-              const Text('No invoices found', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary)),
+              Text('No invoices found', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.getTextPrimary(context))),
               const SizedBox(height: 6),
-              const Text('Try adjusting your search or filters', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+              Text('Try adjusting your search or filters', style: TextStyle(fontSize: 13, color: AppColors.getTextSecondary(context))),
             ],
           ),
         ),
@@ -488,7 +489,6 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
   bool _isPdfSharing = false;
 
   Future<void> _sharePdfFile(BuildContext context) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     setState(() => _isPdfSharing = true);
 
     final lang = LanguageService.currentLanguage.value;
@@ -514,25 +514,22 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
         text: 'Invoice $invoiceNum for $customerName${phone.trim().isNotEmpty ? ' (${_formatPhoneNumber(phone)})' : ''}',
       );
     } else {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to fetch invoice PDF for sharing.'),
-          backgroundColor: AppColors.error,
-        ),
+      showAppSnackBar(
+        context,
+        'Failed to fetch invoice PDF for sharing.',
+        type: SnackBarType.error,
       );
     }
   }
 
   Future<void> _shareOnWhatsApp(BuildContext context) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final phone = widget.invoice['customer_phone']?.toString() ?? '';
     
     if (phone.trim().isEmpty) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Customer phone number is required to share via WhatsApp.'),
-          backgroundColor: AppColors.error,
-        ),
+      showAppSnackBar(
+        context,
+        'Customer phone number is required to share via WhatsApp.',
+        type: SnackBarType.error,
       );
       return;
     }
@@ -561,16 +558,13 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
 
     if (bytes != null && bytes.isNotEmpty) {
       final filename = '${widget.invoice['invoice_number'] ?? 'invoice'}.pdf';
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Sharing PDF for $cleanPhone (Phone number copied to clipboard)'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
+      showAppSnackBar(
+        context,
+        'Sharing PDF for $cleanPhone (Phone copied to clipboard)',
+        type: SnackBarType.success,
       );
       await sharePdf(bytes, filename, text: message);
     } else {
-      // Fallback to text WhatsApp link if PDF fetch fails
       final encodedMessage = Uri.encodeComponent(message);
       final url = Uri.parse('https://wa.me/$cleanPhone?text=$encodedMessage');
 
@@ -578,19 +572,17 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
         if (await canLaunchUrl(url)) {
           await launchUrl(url, mode: LaunchMode.externalApplication);
         } else {
-          scaffoldMessenger.showSnackBar(
-            const SnackBar(
-              content: Text('Could not launch WhatsApp.'),
-              backgroundColor: AppColors.error,
-            ),
+          showAppSnackBar(
+            context,
+            'Could not launch WhatsApp.',
+            type: SnackBarType.error,
           );
         }
       } catch (e) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Error launching WhatsApp: $e'),
-            backgroundColor: AppColors.error,
-          ),
+        showAppSnackBar(
+          context,
+          'Error launching WhatsApp: $e',
+          type: SnackBarType.error,
         );
       }
     }
@@ -608,7 +600,6 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
   }
 
   Future<void> _markAsPaid(BuildContext context) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     setState(() => _isMarkingPaid = true);
 
@@ -621,37 +612,35 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     setState(() => _isMarkingPaid = false);
 
     if (result['success'] == true) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Invoice marked as paid successfully!'),
-          backgroundColor: AppColors.success,
-        ),
+      showAppSnackBar(
+        context,
+        'Invoice marked as paid successfully!',
+        type: SnackBarType.success,
       );
       widget.onRefreshNeeded();
       navigator.pop();
     } else {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(result['message'] ?? 'Failed to update invoice status.'),
-          backgroundColor: AppColors.error,
-        ),
+      showAppSnackBar(
+        context,
+        result['message'] ?? 'Failed to update invoice status.',
+        type: SnackBarType.error,
       );
     }
   }
 
   Future<void> _deleteInvoice(BuildContext context) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Invoice', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete ${widget.invoice['invoice_number']}? This action cannot be undone.'),
+        backgroundColor: AppColors.getSurfaceCard(context),
+        title: Text('Delete Invoice', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context))),
+        content: Text('Are you sure you want to delete ${widget.invoice['invoice_number']}? This action cannot be undone.', style: TextStyle(color: AppColors.getTextSecondary(context))),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text('Cancel', style: TextStyle(color: AppColors.getTextSecondary(context))),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -671,26 +660,23 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     setState(() => _isDeleting = false);
 
     if (success) {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Invoice deleted successfully.'),
-          backgroundColor: AppColors.success,
-        ),
+      showAppSnackBar(
+        context,
+        'Invoice deleted successfully.',
+        type: SnackBarType.success,
       );
       widget.onRefreshNeeded();
       navigator.pop();
     } else {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to delete invoice. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
+      showAppSnackBar(
+        context,
+        'Failed to delete invoice. Please try again.',
+        type: SnackBarType.error,
       );
     }
   }
 
   Future<void> _downloadPdf(BuildContext context) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     setState(() => _isPdfDownloading = true);
 
     final lang = LanguageService.currentLanguage.value;
@@ -702,18 +688,16 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     if (bytes != null && bytes.isNotEmpty) {
       final filename = '${widget.invoice['invoice_number'] ?? 'invoice'}.pdf';
       await saveAndOpenPdf(bytes, filename);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('PDF $filename generated successfully.'),
-          backgroundColor: AppColors.success,
-        ),
+      showAppSnackBar(
+        context,
+        'PDF $filename generated successfully.',
+        type: SnackBarType.success,
       );
     } else {
-      scaffoldMessenger.showSnackBar(
-        const SnackBar(
-          content: Text('Failed to generate PDF. Make sure your server is running.'),
-          backgroundColor: AppColors.error,
-        ),
+      showAppSnackBar(
+        context,
+        'Failed to generate PDF. Make sure your server is running.',
+        type: SnackBarType.error,
       );
     }
   }
@@ -729,16 +713,16 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
     final double totalAmount = double.tryParse(widget.invoice['total']?.toString() ?? '0.0') ?? 0.0;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: AppColors.getSurfaceCard(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
-          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.getBorder(context), borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 20),
           
           // Header
@@ -747,7 +731,7 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF1E40AF), Color(0xFF2563EB), Color(0xFF7C3AED)],
+                colors: [Color(0xFF073822), Color(0xFF0F5132), Color(0xFF10B981)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -775,7 +759,7 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(widget.invoice['invoice_number'] ?? 'INV',
-                          style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(color: Color(0xFFE6F4EA), fontSize: 12, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 2),
                       Text(widget.invoice['customer_name'] ?? 'Unnamed', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                     ],
@@ -837,11 +821,10 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
                       child: OutlinedButton.icon(
                         onPressed: () async {
                           Navigator.pop(context); // Close bottom sheet
-                          final result = await Navigator.push(
+                          final result = await Navigator.pushNamed(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => AddInvoiceScreen(invoice: widget.invoice),
-                            ),
+                            '/edit-invoice',
+                            arguments: widget.invoice,
                           );
                           if (result == true) {
                             widget.onRefreshNeeded();
@@ -937,7 +920,7 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
                             : const Icon(Icons.share_rounded, size: 16, color: Colors.white),
                         label: const Text('Share PDF'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6366F1), // Indigo/Violet
+                          backgroundColor: const Color(0xFF0F5132),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -973,17 +956,17 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(8)),
+              decoration: const BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.all(Radius.circular(8))),
               child: Icon(icon, size: 16, color: AppColors.primary),
             ),
             const SizedBox(width: 12),
-            Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            Text(label, style: TextStyle(color: AppColors.getTextSecondary(context), fontSize: 13)),
             const Spacer(),
             Expanded(
               child: Text(
                 value,
                 textAlign: TextAlign.end,
-                style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
+                style: TextStyle(color: AppColors.getTextPrimary(context), fontWeight: FontWeight.w600, fontSize: 13),
                 overflow: TextOverflow.ellipsis,
               ),
             ),

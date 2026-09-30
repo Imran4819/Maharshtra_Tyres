@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:maharashtra_tyres/services/auth_service.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
+import 'package:maharashtra_tyres/services/reminder_notification_service.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
+import 'package:maharashtra_tyres/widgets/custom_snackbar.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -15,8 +18,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _userName = 'Admin';
   String _userInitials = 'AD';
   String _userIdentifier = 'admin@maharashtratyres.com';
-  bool _darkMode = false;
-  bool _pushNotifications = true;
+  bool _pushNotifications = false;
+  bool _updatingPushNotifications = false;
 
   @override
   void initState() {
@@ -31,13 +34,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final identifier = prefs.getString('logged_user_identifier') ??
         prefs.getString('saved_identifier') ??
         'admin@maharashtratyres.com';
+    final notificationsEnabled =
+        await ReminderNotificationService.instance.isEnabled();
 
     if (mounted) {
       setState(() {
         _userName = name;
         _userInitials = initials;
         _userIdentifier = identifier;
+        _pushNotifications = notificationsEnabled;
       });
+    }
+  }
+
+  Future<void> _setPushNotifications(bool enabled) async {
+    setState(() => _updatingPushNotifications = true);
+    final result =
+        await ReminderNotificationService.instance.setEnabled(enabled);
+    if (!mounted) return;
+
+    setState(() {
+      _pushNotifications = result;
+      _updatingPushNotifications = false;
+    });
+
+    if (enabled && !result) {
+      showAppSnackBar(
+        context,
+        'Allow notifications in your device or browser settings to receive alerts.',
+        type: SnackBarType.info,
+      );
     }
   }
 
@@ -53,7 +79,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       valueListenable: LanguageService.currentLanguage,
       builder: (context, currentLang, child) {
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: AppColors.getScaffoldBg(context),
+          drawer: const AppSidebarDrawer(),
           body: Column(
             children: [
               _buildTopHeader(context),
@@ -99,17 +126,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+          colors: [Color(0xFF073822), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-            onPressed: () => Navigator.maybePop(context),
-          ),
+          const AppSidebarButton(),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 Text(
                   '${LanguageService.tr('select_language')} & Preferences',
-                  style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12),
+                  style: const TextStyle(color: Color(0xFFE6F4EA), fontSize: 12),
                 ),
               ],
             ),
@@ -139,9 +163,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -157,7 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             height: 52,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                colors: [Color(0xFF073822), Color(0xFF0F5132)],
               ),
               borderRadius: BorderRadius.circular(14),
             ),
@@ -179,18 +203,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Text(
                   _userName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: AppColors.getTextPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   _userIdentifier,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: AppColors.getTextSecondary(context),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -222,9 +246,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -241,31 +265,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 width: 32,
                 height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(8),
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
                 ),
                 child: const Icon(Icons.translate_rounded, color: AppColors.primary, size: 18),
               ),
               const SizedBox(width: 10),
               Text(
                 LanguageService.tr('language'),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: AppColors.getTextPrimary(context),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(color: AppColors.border, height: 1),
+          Divider(color: AppColors.getBorder(context), height: 1),
           const SizedBox(height: 14),
 
           // English option
           _buildLanguageOption(
             title: 'English',
-            subtitle: 'Default language',
+            subtitle: 'Default system language',
             code: 'en',
             selected: currentLang == 'en',
             flag: '🇬🇧',
@@ -279,6 +303,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             code: 'mr',
             selected: currentLang == 'mr',
             flag: '🚩',
+          ),
+          const SizedBox(height: 10),
+
+          // Hindi option
+          _buildLanguageOption(
+            title: 'हिंदी (Hindi)',
+            subtitle: 'राष्ट्रभाषा संवाद',
+            code: 'hi',
+            selected: currentLang == 'hi',
+            flag: '🇮🇳',
           ),
         ],
       ),
@@ -297,27 +331,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onTap: () async {
         await LanguageService.setLanguage(code);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                code == 'mr'
-                    ? 'ॲपची भाषा मराठीत बदलली आहे.'
+          showAppSnackBar(
+            context,
+            code == 'mr'
+                ? 'ॲपची भाषा मराठीत बदलली आहे.'
+                : code == 'hi'
+                    ? 'ऐप की भाषा हिंदी में बदल दी गई है।'
                     : 'App language changed to English.',
-              ),
-              backgroundColor: AppColors.success,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
-            ),
+            type: SnackBarType.success,
           );
         }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          color: selected ? AppColors.primaryLight : AppColors.getScaffoldBg(context),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? AppColors.primary : AppColors.getBorder(context),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -334,14 +365,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: selected ? AppColors.primary : AppColors.textPrimary,
+                      color: selected ? AppColors.primary : AppColors.getTextPrimary(context),
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11.5,
-                      color: AppColors.textSecondary,
+                      color: AppColors.getTextSecondary(context),
                     ),
                   ),
                 ],
@@ -350,7 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (selected)
               const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20)
             else
-              const Icon(Icons.radio_button_unchecked_rounded, color: AppColors.textMuted, size: 20),
+              Icon(Icons.radio_button_unchecked_rounded, color: AppColors.getTextSecondary(context).withValues(alpha: 0.5), size: 20),
           ],
         ),
       ),
@@ -359,51 +390,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ─── APP PREFERENCES SECTION ───────────────────────────────────────────────
   Widget _buildAppPreferencesSection() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.tune_rounded, color: AppColors.primary, size: 20),
-              SizedBox(width: 10),
-              Text(
-                'App Preferences',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.themeNotifier,
+      builder: (context, currentMode, child) {
+        final isDarkMode = currentMode == ThemeMode.dark;
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: AppColors.getSurfaceCard(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.getBorder(context)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          SwitchListTile(
-            title: Text(LanguageService.tr('dark_mode'), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-            subtitle: const Text('Light / Dark theme toggle', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-            value: _darkMode,
-            activeTrackColor: AppColors.primary,
-            onChanged: (v) => setState(() => _darkMode = v),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.tune_rounded, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    'App Preferences',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                title: Text(LanguageService.tr('dark_mode'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.getTextPrimary(context))),
+                subtitle: Text('Light / Dark green theme toggle', style: TextStyle(fontSize: 11, color: AppColors.getTextSecondary(context))),
+                value: isDarkMode,
+                activeColor: AppColors.primary,
+                onChanged: (v) {
+                  AppTheme.setThemeMode(v ? ThemeMode.dark : ThemeMode.light);
+                },
+              ),
+              Divider(height: 1, color: AppColors.getBorder(context)),
+              SwitchListTile(
+                title: Text(LanguageService.tr('notifications'), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.getTextPrimary(context))),
+                subtitle: Text('Local alerts for stock and payment reminders', style: TextStyle(fontSize: 11, color: AppColors.getTextSecondary(context))),
+                value: _pushNotifications,
+                activeColor: AppColors.primary,
+                onChanged: _updatingPushNotifications ? null : _setPushNotifications,
+              ),
+            ],
           ),
-          const Divider(height: 1, color: AppColors.border),
-          SwitchListTile(
-            title: Text(LanguageService.tr('notifications'), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
-            subtitle: const Text('Push alerts for stock & payment due dates', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-            value: _pushNotifications,
-            activeTrackColor: AppColors.primary,
-            onChanged: (v) => setState(() => _pushNotifications = v),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -412,9 +452,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -432,31 +472,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(width: 10),
               Text(
                 LanguageService.tr('app_title'),
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const ListTile(
-            dense: true,
-            leading: Icon(Icons.verified_outlined, size: 18, color: AppColors.textSecondary),
-            title: Text('App Version', style: TextStyle(fontSize: 13)),
-            trailing: Text('v1.0.0+1', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          ),
-          const Divider(height: 1, color: AppColors.border),
           ListTile(
             dense: true,
-            leading: const Icon(Icons.privacy_tip_outlined, size: 18, color: AppColors.textSecondary),
-            title: Text(LanguageService.tr('privacy_policy'), style: const TextStyle(fontSize: 13)),
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.textMuted),
+            leading: Icon(Icons.verified_outlined, size: 18, color: AppColors.getTextSecondary(context)),
+            title: Text('App Version', style: TextStyle(fontSize: 13, color: AppColors.getTextPrimary(context))),
+            trailing: Text('v2.0.0 (Dark Green Redesign)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.getTextPrimary(context))),
+          ),
+          Divider(height: 1, color: AppColors.getBorder(context)),
+          ListTile(
+            dense: true,
+            leading: Icon(Icons.privacy_tip_outlined, size: 18, color: AppColors.getTextSecondary(context)),
+            title: Text(LanguageService.tr('privacy_policy'), style: TextStyle(fontSize: 13, color: AppColors.getTextPrimary(context))),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.getTextSecondary(context)),
             onTap: () {},
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.getBorder(context)),
           ListTile(
             dense: true,
-            leading: const Icon(Icons.support_agent_rounded, size: 18, color: AppColors.textSecondary),
-            title: Text(LanguageService.tr('help_support'), style: const TextStyle(fontSize: 13)),
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.textMuted),
+            leading: Icon(Icons.support_agent_rounded, size: 18, color: AppColors.getTextSecondary(context)),
+            title: Text(LanguageService.tr('help_support'), style: TextStyle(fontSize: 13, color: AppColors.getTextPrimary(context))),
+            trailing: Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.getTextSecondary(context)),
             onTap: () {},
           ),
         ],

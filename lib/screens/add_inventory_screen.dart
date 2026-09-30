@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
+import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/inventory_service.dart';
+import 'package:maharashtra_tyres/widgets/custom_snackbar.dart';
 
 class AddInventoryScreen extends StatefulWidget {
   const AddInventoryScreen({super.key, this.item});
@@ -26,13 +29,15 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
 
   bool get _isEdit => widget.item != null;
 
+  final List<String> _popularBrands = ['MRF', 'CEAT', 'Apollo', 'JK Tyre', 'Bridgestone', 'Goodyear', 'Michelin'];
+
   @override
   void initState() {
     super.initState();
     _productNameController = TextEditingController(text: widget.item?['product_name'] ?? '');
     _companyController = TextEditingController(text: widget.item?['company'] ?? '');
     _sizeController = TextEditingController(text: widget.item?['size'] ?? '');
-    _quantityController = TextEditingController(text: widget.item?['quantity'] ?? '');
+    _quantityController = TextEditingController(text: widget.item?['quantity']?.toString() ?? '');
     _dateController = TextEditingController(text: widget.item?['date'] ?? '');
     _status = widget.item?['status'] ?? 'active';
   }
@@ -53,22 +58,9 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-              onSurface: AppColors.textPrimary,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
     if (picked != null) {
       setState(() {
-        // Format to YYYY-MM-DD
         _dateController.text =
             "${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
       });
@@ -77,27 +69,14 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
 
   Future<void> _saveItem() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
     final qty = double.tryParse(_quantityController.text.trim()) ?? 0.0;
     if (_status == 'inactive' && qty > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: const Row(
-            children: [
-              Icon(Icons.error_outline_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Cannot set product status to Inactive while stock is available (> 0).',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        'Cannot set product status to Inactive while stock is available (> 0).',
+        isError: true,
       );
       return;
     }
@@ -130,41 +109,17 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
     setState(() => _isSaving = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white),
-              const SizedBox(width: 10),
-              Text(
-                'Product ${_isEdit ? 'updated' : 'added'} successfully!',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        _isEdit ? 'Product stock updated successfully!' : 'New product added to inventory!',
+        isSuccess: true,
       );
       Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.white),
-              const SizedBox(width: 10),
-              Text(
-                'Failed to ${_isEdit ? 'update' : 'add'} product. Please try again.',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        'Failed to save product. Please try again.',
+        isError: true,
       );
     }
   }
@@ -172,9 +127,11 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
+      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           _buildTopBar(context),
@@ -202,36 +159,79 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
                           children: [
                             _buildField(
                               controller: _productNameController,
-                              label: 'Product Name',
-                              hint: 'e.g. Premium Layer Feed',
+                              label: LanguageService.tr('product_name'),
+                              hint: 'e.g. ZVTS 175/65 R14',
                               icon: Icons.label_important_outline_rounded,
                               validator: (v) =>
                                   v == null || v.trim().isEmpty ? 'Product name is required' : null,
                             ),
                             const SizedBox(height: 16),
+
+                            // Quick Brand Chips
+                            Text(
+                              LanguageService.tr('brand'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _popularBrands.map((b) {
+                                final selected = _companyController.text.trim().toLowerCase() == b.toLowerCase();
+                                return ChoiceChip(
+                                  label: Text(b),
+                                  selected: selected,
+                                  selectedColor: AppColors.primary,
+                                  labelStyle: TextStyle(
+                                    color: selected ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                  onSelected: (val) {
+                                    if (val) {
+                                      setState(() => _companyController.text = b);
+                                    }
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                            const SizedBox(height: 12),
+
                             _buildField(
                               controller: _companyController,
-                              label: 'Company/Brand',
-                              hint: 'e.g. Supreme Feeds Ltd',
+                              label: 'Company / Brand',
+                              hint: 'e.g. MRF, CEAT, Apollo',
                               icon: Icons.business_outlined,
                               isOptional: true,
                             ),
                             const SizedBox(height: 16),
-                            _buildField(
-                              controller: _sizeController,
-                              label: 'Size/Dimensions',
-                              hint: 'e.g. 50kg Bag',
-                              icon: Icons.aspect_ratio_rounded,
-                              isOptional: true,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildField(
-                              controller: _quantityController,
-                              label: 'Quantity',
-                              hint: 'e.g. 250',
-                              icon: Icons.layers_outlined,
-                              keyboardType: TextInputType.number,
-                              isOptional: true,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildField(
+                                    controller: _sizeController,
+                                    label: 'Size / Spec',
+                                    hint: 'e.g. 175/65 R14',
+                                    icon: Icons.aspect_ratio_rounded,
+                                    isOptional: true,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildField(
+                                    controller: _quantityController,
+                                    label: LanguageService.tr('quantity'),
+                                    hint: 'e.g. 10',
+                                    icon: Icons.layers_outlined,
+                                    keyboardType: TextInputType.number,
+                                    isOptional: true,
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 16),
                             _buildDateField(),
@@ -240,7 +240,7 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
                         const SizedBox(height: 28),
                         SizedBox(
                           width: double.infinity,
-                          height: 56,
+                          height: 52,
                           child: _isSaving ? _buildLoadingButton() : _buildSaveButton(),
                         ),
                         const SizedBox(height: 12),
@@ -249,18 +249,7 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
                           height: 50,
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.border, width: 1.5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
+                            child: Text(LanguageService.tr('cancel')),
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -280,49 +269,33 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
-        bottom: 12,
+        bottom: 16,
         left: 8,
         right: 20,
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+          colors: [Color(0xFF073822), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
+          const AppSidebarButton(),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isEdit ? 'Edit Product' : 'Add Product',
+                  _isEdit ? LanguageService.tr('update_product') : LanguageService.tr('add_product'),
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
                 ),
                 Text(
-                  _isEdit ? 'Update product details in stock' : 'Add new items to the inventory',
-                  style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12),
+                  _isEdit ? 'Edit item details & stock count' : 'Add new product stock to inventory',
+                  style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 12),
                 ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.inventory_2_outlined, color: Colors.white, size: 16),
-                const SizedBox(width: 6),
-                Text(_isEdit ? 'Edit' : 'Stock', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -330,6 +303,7 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
       ),
     );
   }
+
 
   Widget _buildAvatarSection() {
     return Center(

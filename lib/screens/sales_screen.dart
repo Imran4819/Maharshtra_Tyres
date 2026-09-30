@@ -4,6 +4,7 @@ import 'package:maharashtra_tyres/screens/add_invoice_screen.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});
@@ -101,7 +102,8 @@ class _SalesScreenState extends State<SalesScreen> {
       valueListenable: LanguageService.currentLanguage,
       builder: (context, currentLang, child) {
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: AppColors.getScaffoldBg(context),
+          drawer: const AppSidebarDrawer(),
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppColors.primary,
             onPressed: () async {
@@ -168,18 +170,14 @@ class _SalesScreenState extends State<SalesScreen> {
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+          colors: [Color(0xFF073822), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: Colors.white, size: 20),
-            onPressed: () => Navigator.maybePop(context),
-          ),
+          const AppSidebarButton(),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,14 +192,10 @@ class _SalesScreenState extends State<SalesScreen> {
                 ),
                 Text(
                   LanguageService.tr('sales'),
-                  style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12),
+                  style: const TextStyle(color: Color(0xFFE6F4EA), fontSize: 12),
                 ),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _loadSales,
           ),
         ],
       ),
@@ -226,18 +220,18 @@ class _SalesScreenState extends State<SalesScreen> {
                 decoration: BoxDecoration(
                   gradient: isSelected
                       ? const LinearGradient(
-                          colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                          colors: [Color(0xFF0F5132), Color(0xFF10B981)],
                         )
                       : null,
-                  color: isSelected ? null : Colors.white,
+                  color: isSelected ? null : AppColors.getSurfaceCard(context),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected ? Colors.transparent : AppColors.border,
+                    color: isSelected ? Colors.transparent : AppColors.getBorder(context),
                   ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.3),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           )
@@ -249,7 +243,7 @@ class _SalesScreenState extends State<SalesScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    color: isSelected ? Colors.white : AppColors.getTextSecondary(context),
                   ),
                 ),
               ),
@@ -268,23 +262,23 @@ class _SalesScreenState extends State<SalesScreen> {
         value: '₹${_totalRevenue.toStringAsFixed(0)}',
         icon: Icons.currency_rupee_rounded,
         iconColor: const Color(0xFF10B981),
-        bgColor: const Color(0xFFECFDF5),
+        bgColor: const Color(0xFF10B981).withValues(alpha: 0.15),
         trend: '+14.2% vs last month',
       ),
       _MetricData(
         title: 'Total Sales',
         value: '${_invoices.length}',
         icon: Icons.shopping_bag_outlined,
-        iconColor: const Color(0xFF2563EB),
-        bgColor: const Color(0xFFEFF6FF),
+        iconColor: AppColors.primary,
+        bgColor: AppColors.primaryLight,
         trend: '$_paidCount Paid / $_pendingCount Pending',
       ),
       _MetricData(
         title: 'Avg Order Value',
         value: '₹${_avgOrderValue.toStringAsFixed(0)}',
         icon: Icons.analytics_outlined,
-        iconColor: const Color(0xFF8B5CF6),
-        bgColor: const Color(0xFFF5F3FF),
+        iconColor: AppColors.accent,
+        bgColor: AppColors.accent.withValues(alpha: 0.15),
         trend: 'Per transaction',
       ),
       _MetricData(
@@ -292,18 +286,23 @@ class _SalesScreenState extends State<SalesScreen> {
         value: '₹${_pendingRevenue.toStringAsFixed(0)}',
         icon: Icons.pending_actions_rounded,
         iconColor: const Color(0xFFF59E0B),
-        bgColor: const Color(0xFFFEF3C7),
+        bgColor: const Color(0xFFF59E0B).withValues(alpha: 0.15),
         trend: '$_pendingCount Unpaid Invoices',
       ),
     ];
 
     return LayoutBuilder(builder: (context, constraints) {
-      final cols = constraints.maxWidth > 560 ? 4 : 2;
+      final cols = constraints.maxWidth > 720 ? 4 : 2;
+      const crossAxisSpacing = 12.0;
+      const cardHeight = 148.0;
+      final cardWidth =
+          (constraints.maxWidth - crossAxisSpacing * (cols - 1)) / cols;
       return GridView.count(
         crossAxisCount: cols,
         mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: cols == 4 ? 1.6 : 1.45,
+        crossAxisSpacing: crossAxisSpacing,
+        // Derive the ratio from a fixed height so wrapped labels fit on phones.
+        childAspectRatio: cardWidth / cardHeight,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         children: metrics.map((m) => _buildMetricCard(m)).toList(),
@@ -315,9 +314,9 @@ class _SalesScreenState extends State<SalesScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -351,24 +350,30 @@ class _SalesScreenState extends State<SalesScreen> {
             children: [
               Text(
                 m.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  color: AppColors.textPrimary,
+                  color: AppColors.getTextPrimary(context),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 m.title,
-                style: const TextStyle(
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textSecondary,
+                  color: AppColors.getTextSecondary(context),
                   fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 m.trend,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 9.5,
                   fontWeight: FontWeight.w600,
@@ -385,18 +390,18 @@ class _SalesScreenState extends State<SalesScreen> {
   // ─── CATEGORY DISTRIBUTION CARD ──────────────────────────────────────────
   Widget _buildCategoryDistributionCard() {
     final categories = [
-      _CategoryProgress('Truck & Bus Tyres', 0.45, '₹82,500', const Color(0xFF2563EB)),
+      _CategoryProgress('Truck & Bus Tyres', 0.45, '₹82,500', const Color(0xFF0F5132)),
       _CategoryProgress('Car & SUV Tyres', 0.30, '₹55,200', const Color(0xFF10B981)),
       _CategoryProgress('Two-Wheeler Tyres', 0.15, '₹27,600', const Color(0xFFF59E0B)),
-      _CategoryProgress('Tubes & Accessories', 0.10, '₹19,200', const Color(0xFF8B5CF6)),
+      _CategoryProgress('Tubes & Accessories', 0.10, '₹19,200', AppColors.accent),
     ];
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -408,7 +413,7 @@ class _SalesScreenState extends State<SalesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
@@ -416,11 +421,11 @@ class _SalesScreenState extends State<SalesScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
-                  color: AppColors.textPrimary,
+                  color: AppColors.getTextPrimary(context),
                 ),
               ),
               Icon(Icons.pie_chart_outline_rounded,
-                  size: 18, color: AppColors.textSecondary),
+                  size: 18, color: AppColors.getTextSecondary(context)),
             ],
           ),
           const SizedBox(height: 16),
@@ -433,10 +438,10 @@ class _SalesScreenState extends State<SalesScreen> {
                       children: [
                         Text(
                           cat.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                            color: AppColors.getTextPrimary(context),
                           ),
                         ),
                         Text(
@@ -455,7 +460,7 @@ class _SalesScreenState extends State<SalesScreen> {
                       child: LinearProgressIndicator(
                         value: cat.percent,
                         minHeight: 6,
-                        backgroundColor: AppColors.border.withValues(alpha: 0.5),
+                        backgroundColor: AppColors.getBorder(context).withValues(alpha: 0.5),
                         valueColor: AlwaysStoppedAnimation<Color>(cat.color),
                       ),
                     ),
@@ -473,9 +478,9 @@ class _SalesScreenState extends State<SalesScreen> {
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.getSurfaceCard(context),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.getBorder(context)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
@@ -487,17 +492,17 @@ class _SalesScreenState extends State<SalesScreen> {
           child: TextField(
             controller: _searchController,
             onChanged: (v) => setState(() => _searchQuery = v),
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            style: TextStyle(color: AppColors.getTextPrimary(context), fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Search sales by invoice or customer...',
               hintStyle:
-                  const TextStyle(color: AppColors.textMuted, fontSize: 13),
-              prefixIcon: const Icon(Icons.search_rounded,
-                  color: AppColors.textSecondary, size: 20),
+                  TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7), fontSize: 13),
+              prefixIcon: Icon(Icons.search_rounded,
+                  color: AppColors.getTextSecondary(context), size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: AppColors.textSecondary, size: 18),
+                      icon: Icon(Icons.close_rounded,
+                          color: AppColors.getTextSecondary(context), size: 18),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
@@ -528,16 +533,16 @@ class _SalesScreenState extends State<SalesScreen> {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: isSel ? Colors.white : AppColors.textSecondary,
+                      color: isSel ? Colors.white : AppColors.getTextSecondary(context),
                     ),
                   ),
                   selected: isSel,
                   selectedColor: AppColors.primary,
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.getSurfaceCard(context),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
                     side: BorderSide(
-                      color: isSel ? Colors.transparent : AppColors.border,
+                      color: isSel ? Colors.transparent : AppColors.getBorder(context),
                     ),
                   ),
                   onSelected: (_) => setState(() => _selectedStatus = st),
@@ -570,18 +575,18 @@ class _SalesScreenState extends State<SalesScreen> {
                     size: 32, color: AppColors.primary),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'No sales transactions found',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
-                  color: AppColors.textPrimary,
+                  color: AppColors.getTextPrimary(context),
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Try creating a new sale or adjusting your filters.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context)),
               ),
             ],
           ),
@@ -599,17 +604,17 @@ class _SalesScreenState extends State<SalesScreen> {
             children: [
               Text(
                 'Sales Transactions (${list.length})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: AppColors.getTextPrimary(context),
                 ),
               ),
               Text(
                 'Filter: $_selectedStatus',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textSecondary,
+                  color: AppColors.getTextSecondary(context),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -639,10 +644,10 @@ class _SalesScreenState extends State<SalesScreen> {
             : const Color(0xFFDC2626);
 
     final statusBg = isPaid
-        ? const Color(0xFFECFDF5)
+        ? const Color(0xFF10B981).withValues(alpha: 0.15)
         : isPending
-            ? const Color(0xFFFEF3C7)
-            : const Color(0xFFFEF2F2);
+            ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+            : const Color(0xFFEF4444).withValues(alpha: 0.15);
 
     final customerName = sale['customer_name']?.toString() ?? 'Walk-in Customer';
     final invoiceNo = sale['invoice_number']?.toString() ?? 'INV';
@@ -651,9 +656,9 @@ class _SalesScreenState extends State<SalesScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.025),
@@ -713,7 +718,7 @@ class _SalesScreenState extends State<SalesScreen> {
           padding: const EdgeInsets.only(top: 4),
           child: Text(
             '$customerName • ${sale['created_at'] ?? sale['due_date'] ?? 'Recent'}',
-            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 11.5, color: AppColors.getTextSecondary(context)),
           ),
         ),
         trailing: Column(
@@ -722,15 +727,15 @@ class _SalesScreenState extends State<SalesScreen> {
           children: [
             Text(
               '₹${totalAmount.toStringAsFixed(2)}',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14.5,
-                color: AppColors.textPrimary,
+                color: AppColors.getTextPrimary(context),
               ),
             ),
             const SizedBox(height: 2),
-            const Icon(Icons.chevron_right_rounded,
-                size: 16, color: AppColors.textMuted),
+            Icon(Icons.chevron_right_rounded,
+                size: 16, color: AppColors.getTextSecondary(context)),
           ],
         ),
         onTap: () {
@@ -743,6 +748,7 @@ class _SalesScreenState extends State<SalesScreen> {
   void _showSaleQuickDetail(Map<String, dynamic> sale) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: AppColors.getSurfaceCard(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -757,19 +763,19 @@ class _SalesScreenState extends State<SalesScreen> {
               children: [
                 Text(
                   sale['invoice_number'] ?? 'Sale Details',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: AppColors.textPrimary,
+                    color: AppColors.getTextPrimary(context),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded),
+                  icon: Icon(Icons.close_rounded, color: AppColors.getTextSecondary(context)),
                   onPressed: () => Navigator.pop(ctx),
                 ),
               ],
             ),
-            const Divider(),
+            Divider(color: AppColors.getBorder(context)),
             const SizedBox(height: 8),
             _detailRow('Customer', sale['customer_name'] ?? 'N/A'),
             _detailRow('Phone', sale['customer_phone'] ?? 'N/A'),
@@ -822,17 +828,18 @@ class _SalesScreenState extends State<SalesScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+              style: TextStyle(color: AppColors.getTextSecondary(context), fontSize: 13)),
           Text(value,
-              style: const TextStyle(
+              style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: AppColors.getTextPrimary(context),
                   fontSize: 13)),
         ],
       ),
     );
   }
 }
+
 
 class _MetricData {
   const _MetricData({

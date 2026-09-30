@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
+import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/customer_service.dart';
+import 'package:maharashtra_tyres/widgets/custom_snackbar.dart';
 
 class AddCustomerScreen extends StatefulWidget {
   const AddCustomerScreen({super.key, this.customer});
@@ -49,6 +52,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
 
   Future<void> _saveCustomer() async {
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
     setState(() => _isSaving = true);
 
@@ -78,41 +82,17 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
     setState(() => _isSaving = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Row(
-            children: [
-              const Icon(Icons.check_circle_rounded, color: Colors.white),
-              const SizedBox(width: 10),
-              Text(
-                'Customer ${_isEdit ? 'updated' : 'added'} successfully!',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        _isEdit ? 'Customer updated successfully!' : 'Customer added successfully!',
+        isSuccess: true,
       );
-      Navigator.pop(context, true); // Return true to notify parent list to reload
+      Navigator.pop(context, true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.white),
-              const SizedBox(width: 10),
-              Text(
-                'Failed to ${_isEdit ? 'update' : 'add'} customer. Please try again.',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        'Failed to save customer. Please try again.',
+        isError: true,
       );
     }
   }
@@ -120,9 +100,11 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
+      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           _buildTopBar(context),
@@ -143,65 +125,59 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                         _buildStatusToggle(),
                         const SizedBox(height: 20),
                         _buildSectionCard(
-                          title: 'Customer Details',
+                          title: LanguageService.tr('customer_details'),
                           icon: Icons.person_outline_rounded,
                           iconColor: AppColors.primary,
                           iconBg: AppColors.primaryLight,
                           children: [
                             _buildField(
                               controller: _nameController,
-                              label: 'Full Name',
-                              hint: 'e.g. Jane Doe',
+                              label: LanguageService.tr('full_name'),
+                              hint: 'e.g. Ramesh Patil',
                               icon: Icons.badge_outlined,
                               validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
                             ),
                             const SizedBox(height: 16),
                             _buildField(
                               controller: _phoneController,
-                              label: 'Phone Number',
-                              hint: 'e.g. +1987655321',
+                              label: LanguageService.tr('phone'),
+                              hint: 'e.g. 9876543210',
                               icon: Icons.phone_outlined,
                               keyboardType: TextInputType.phone,
-                              isOptional: true,
+                              validator: (v) => v == null || v.trim().isEmpty ? 'Phone is required' : null,
                             ),
                             const SizedBox(height: 16),
                             _buildField(
                               controller: _emailController,
-                              label: 'Email Address',
-                              hint: 'e.g. jane.doe@example.com',
+                              label: LanguageService.tr('email'),
+                              hint: 'e.g. ramesh@example.com',
                               icon: Icons.email_outlined,
                               keyboardType: TextInputType.emailAddress,
                               isOptional: true,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) return null;
-                                final emailRegex = RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$');
-                                if (!emailRegex.hasMatch(v.trim())) return 'Enter a valid email address';
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            _buildField(
-                              controller: _addressController,
-                              label: 'Street Address',
-                              hint: 'e.g. 123 Main St',
-                              icon: Icons.home_outlined,
-                              isOptional: true,
-                              maxLines: 2,
                             ),
                             const SizedBox(height: 16),
                             _buildField(
                               controller: _cityController,
-                              label: 'City',
-                              hint: 'e.g. Metropolis',
+                              label: LanguageService.tr('city'),
+                              hint: 'e.g. Pune / Mumbai / Nashik',
                               icon: Icons.location_city_outlined,
                               isOptional: true,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildField(
+                              controller: _addressController,
+                              label: LanguageService.tr('address'),
+                              hint: 'e.g. Shop #4, Main Road, Pune',
+                              icon: Icons.home_outlined,
+                              isOptional: true,
+                              maxLines: 2,
                             ),
                           ],
                         ),
                         const SizedBox(height: 28),
                         SizedBox(
                           width: double.infinity,
-                          height: 56,
+                          height: 52,
                           child: _isSaving ? _buildLoadingButton() : _buildSaveButton(),
                         ),
                         const SizedBox(height: 12),
@@ -210,18 +186,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                           height: 50,
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: AppColors.border, width: 1.5),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            child: const Text(
-                              'Cancel',
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
+                            child: Text(LanguageService.tr('cancel')),
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -241,49 +206,33 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
-        bottom: 12,
+        bottom: 16,
         left: 8,
         right: 20,
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+          colors: [Color(0xFF073822), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
+          const AppSidebarButton(),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isEdit ? 'Edit Customer' : 'Add Customer',
+                  _isEdit ? LanguageService.tr('update_customer') : LanguageService.tr('add_customer'),
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
                 ),
                 Text(
-                  _isEdit ? 'Update the details of the customer' : 'Register a new customer',
-                  style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12),
+                  _isEdit ? 'Update details of customer' : 'Register a new customer',
+                  style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 12),
                 ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.people_alt_outlined, color: Colors.white, size: 16),
-                const SizedBox(width: 6),
-                Text(_isEdit ? 'Edit' : 'Customer', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -291,6 +240,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
       ),
     );
   }
+
 
   Widget _buildAvatarSection() {
     return Center(

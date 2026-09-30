@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
+import 'package:maharashtra_tyres/services/language_service.dart';
+import 'package:maharashtra_tyres/services/reminder_notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -68,7 +70,17 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     
     if (!mounted) return;
     if (isLoggedIn) {
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      final initialReminder =
+          ReminderNotificationService.instance.takeInitialNotification();
+      if (initialReminder != null) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/reminders',
+          arguments: initialReminder,
+        );
+      } else {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
     } else {
       Navigator.pushReplacementNamed(context, '/login');
     }
@@ -85,18 +97,20 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   Widget _buildTyreWheel() {
     return Container(
-      width: 130,
-      height: 130,
+      width: 140,
+      height: 140,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
+        color: const Color(0xFF041C12),
         border: Border.all(
-          color: const Color(0xFF1E293B), // Tyre body (dark slate)
-          width: 18,
+          color: AppColors.primaryAccent,
+          width: 16,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E293B).withValues(alpha: 0.15),
-            blurRadius: 20,
+            color: AppColors.primaryAccent.withValues(alpha: 0.35),
+            blurRadius: 30,
+            spreadRadius: 2,
             offset: const Offset(0, 8),
           ),
         ],
@@ -106,13 +120,13 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         children: [
           // Inner alloy rim
           Container(
-            width: 86,
-            height: 86,
+            width: 92,
+            height: 92,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.transparent,
               border: Border.all(
-                color: const Color(0xFF94A3B8), // Outer rim lip
+                color: const Color(0xFFA7F3D0),
                 width: 3.5,
               ),
             ),
@@ -124,23 +138,23 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               angle: angle,
               child: Container(
                 width: 5,
-                height: 86,
-                color: const Color(0xFFCBD5E1), // Alloy spoke
+                height: 92,
+                color: const Color(0xFF6EE7B7),
               ),
             );
           }),
           // Center hub cap
           Container(
-            width: 22,
-            height: 22,
+            width: 24,
+            height: 24,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0xFF475569),
+              color: Color(0xFF0F5132),
             ),
           ),
           Container(
-            width: 8,
-            height: 8,
+            width: 10,
+            height: 10,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
@@ -154,128 +168,140 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // Ultra-clean premium slate-white background
-      body: Stack(
-        children: [
-          // Soft decorative background shapes
-          Positioned(
-            top: -40,
-            right: -30,
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.04),
-              ),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Color(0xFF09291B), // Dark Forest Emerald
+              Color(0xFF051C12),
+              Color(0xFF03120B),
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          Positioned(
-            bottom: -50,
-            left: -40,
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: 0.04),
-              ),
-            ),
-          ),
-          // Central layout
-          Center(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Spinning Tyre Logo
-                    RotationTransition(
-                      turns: _rotationController,
-                      child: _buildTyreWheel(),
-                    ),
-                    const SizedBox(height: 36),
-                    // App Logo Text
-                    const Text(
-                      'MAHARASHTRA TYRES',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.6,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Tagline
-                    const Text(
-                      'Tyre Shop Billing & Management System',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 48),
-                    // Sleek progress bar
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 240),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Container(
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: AppColors.border,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: AnimatedBuilder(
-                              animation: _progressAnimation,
-                              builder: (context, child) {
-                                return FractionallySizedBox(
-                                  alignment: Alignment.centerLeft,
-                                  widthFactor: _progressAnimation.value,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(10),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppColors.primary.withValues(alpha: 0.3),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          const Text(
-                            'Loading system...',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textMuted,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+        ),
+        child: Stack(
+          children: [
+            // Soft decorative glowing background circles
+            Positioned(
+              top: -60,
+              right: -40,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primaryAccent.withValues(alpha: 0.08),
                 ),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              bottom: -80,
+              left: -60,
+              child: Container(
+                width: 360,
+                height: 360,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primaryAccent.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            // Central layout
+            Center(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Spinning Tyre Logo
+                      RotationTransition(
+                        turns: _rotationController,
+                        child: _buildTyreWheel(),
+                      ),
+                      const SizedBox(height: 40),
+                      // App Logo Text
+                      Text(
+                        LanguageService.tr('app_title').toUpperCase(),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Tagline
+                      Text(
+                        LanguageService.tr('tagline'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFFA7F3D0),
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 52),
+                      // Progress bar
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 240),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: AnimatedBuilder(
+                                animation: _progressAnimation,
+                                builder: (context, child) {
+                                  return FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: _progressAnimation.value,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primaryAccent,
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.primaryAccent.withValues(alpha: 0.6),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Initializing system...',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF6EE7B7),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

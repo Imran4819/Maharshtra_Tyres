@@ -3,6 +3,8 @@ import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/inventory_service.dart';
 import 'package:maharashtra_tyres/screens/add_inventory_screen.dart';
+import 'package:maharashtra_tyres/screens/edit_inventory_screen.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -63,11 +65,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ValueListenableBuilder<String>(
       valueListenable: LanguageService.currentLanguage,
       builder: (context, currentLang, child) {
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
+          drawer: const AppSidebarDrawer(),
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppColors.primary,
             onPressed: () async {
@@ -118,35 +122,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
-        bottom: 14,
+        bottom: 16,
         left: 8,
         right: 20,
       ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF073822), Color(0xFF0F5132)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
+          const AppSidebarButton(),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(LanguageService.tr('inventory'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-                Text(LanguageService.tr('inventory_stock'), style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12)),
+                Text(LanguageService.tr('inventory_stock'), style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 12)),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _loadInventory,
           ),
         ],
       ),
@@ -164,19 +161,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
 
     final stats = [
-      _Stat('Total Products', '${_inventory.length}', Icons.inventory_2_rounded, const Color(0xFF2563EB), const Color(0xFFEFF6FF)),
+      _Stat('Total Products', '${_inventory.length}', Icons.inventory_2_rounded, AppColors.primary, AppColors.primaryLight),
       _Stat('Active Stock', '$activeCount', Icons.check_circle_outline_rounded, const Color(0xFF10B981), const Color(0xFFECFDF5)),
       _Stat('Inactive Stock', '$inactiveCount', Icons.cancel_outlined, const Color(0xFFEF4444), const Color(0xFFFEF2F2)),
       _Stat('Total Quantity', totalQty.toStringAsFixed(0), Icons.layers_rounded, const Color(0xFF8B5CF6), const Color(0xFFF5F3FF)),
     ];
 
     return LayoutBuilder(builder: (_, c) {
-      final cols = c.maxWidth > 500 ? 4 : 2;
+      final cols = c.maxWidth > 720 ? 4 : 2;
+      const crossAxisSpacing = 12.0;
+      const cardHeight = 128.0;
+      final cardWidth =
+          (c.maxWidth - crossAxisSpacing * (cols - 1)) / cols;
       return GridView.count(
         crossAxisCount: cols,
         mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: cols == 4 ? 1.8 : 1.6,
+        crossAxisSpacing: crossAxisSpacing,
+        // Reserve enough height for the value and label inside each card.
+        childAspectRatio: cardWidth / cardHeight,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         children: stats.map((s) => _statCard(s)).toList(),
@@ -184,112 +186,128 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
-  Widget _statCard(_Stat s) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(color: s.bgColor, borderRadius: BorderRadius.circular(9)),
-              child: Icon(s.icon, color: s.iconColor, size: 18),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(s.value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: s.iconColor)),
-                Text(s.label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ],
-        ),
-      );
-
-  Widget _buildSearchFilter() => Column(
+  Widget _statCard(_Stat s) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
-              ],
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (v) => setState(() => _searchQuery = v),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                hintText: LanguageService.tr('search_products'),
-                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _searchQuery = '');
-                        },
-                      )
-                    : null,
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(color: isDark ? AppColors.bgDark : s.bgColor, borderRadius: BorderRadius.circular(10)),
+            child: Icon(s.icon, color: s.iconColor, size: 18),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                s.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: s.iconColor),
               ),
+              Text(
+                s.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchFilter() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (v) => setState(() => _searchQuery = v),
+            style: TextStyle(color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: LanguageService.tr('search_products'),
+              hintStyle: TextStyle(color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight, fontSize: 13),
+              prefixIcon: Icon(Icons.search_rounded, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, size: 20),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(Icons.close_rounded, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _searchQuery = '');
+                      },
+                    )
+                  : null,
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 36,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: _filters.map((f) {
-                final sel = _selectedFilter == f;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedFilter = f),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: sel ? const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF7C3AED)]) : null,
-                        color: sel ? null : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: sel ? Colors.transparent : AppColors.border),
-                      ),
-                      child: Text(
-                        f,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: sel ? Colors.white : AppColors.textSecondary,
-                        ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 36,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            children: _filters.map((f) {
+              final sel = _selectedFilter == f;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedFilter = f),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: sel ? AppColors.primary : (isDark ? AppColors.surfaceDark : Colors.white),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: sel ? Colors.transparent : (isDark ? AppColors.borderDark : AppColors.borderLight)),
+                    ),
+                    child: Text(
+                      f,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: sel ? Colors.white : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                       ),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              );
+            }).toList(),
           ),
-        ],
-      );
+        ),
+      ],
+    );
+  }
 
   Widget _buildList() {
     final list = _filtered;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (list.isEmpty) return _emptyState();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +316,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             '${list.length} product${list.length == 1 ? '' : 's'} found',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 13, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontWeight: FontWeight.w500),
           ),
         ),
         ListView.separated(
@@ -313,6 +331,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _productCard(Map<String, dynamic> p) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final status = p['status']?.toString().toLowerCase() ?? 'active';
     final bool isActive = status == 'active';
     final initials = p['product_name'] != null && p['product_name'].toString().isNotEmpty
@@ -321,18 +340,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           onTap: () => _showDetail(context, p),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -343,7 +362,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   height: 48,
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                      colors: [Color(0xFF0F5132), Color(0xFF10B981)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -366,7 +385,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           Expanded(
                             child: Text(
                               p['product_name'] ?? 'Unnamed Product',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -390,7 +409,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Text(p['company'] ?? 'No Brand', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          Text(p['company'] ?? 'No Brand', style: TextStyle(fontSize: 12, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
                           const SizedBox(width: 8),
                           if (p['size'] != null && p['size'].toString().isNotEmpty)
                             Container(
@@ -408,14 +427,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         children: [
                           _miniInfo(Icons.layers_outlined, '${p['quantity'] ?? '0'} units', AppColors.primary),
                           const SizedBox(width: 16),
-                          _miniInfo(Icons.calendar_today_rounded, p['date'] ?? 'No Date', AppColors.textSecondary),
+                          _miniInfo(Icons.calendar_today_rounded, p['date'] ?? 'No Date', isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                         ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 20),
+                Icon(Icons.chevron_right_rounded, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight, size: 20),
               ],
             ),
           ),
@@ -423,6 +442,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
     );
   }
+
 
   Widget _miniInfo(IconData icon, String text, Color color) => Row(
         children: [

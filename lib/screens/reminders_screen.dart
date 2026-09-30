@@ -4,6 +4,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
 import 'package:maharashtra_tyres/services/inventory_service.dart';
+import 'package:maharashtra_tyres/services/reminder_notification_service.dart';
+import 'package:maharashtra_tyres/widgets/custom_snackbar.dart';
+import 'package:maharashtra_tyres/widgets/reminder_notification_popup.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 import 'dart:convert';
 
 class RemindersScreen extends StatefulWidget {
@@ -18,8 +22,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
   List<Map<String, dynamic>> _reminders = [];
   final Set<String> _sendingReminderIds = {};
   bool _isLoading = false;
+  bool _notificationsEnabled = false;
+  bool _updatingNotificationSetting = false;
   String _selectedCategory = 'All';
   String _searchQuery = '';
+  bool _checkedNotificationRoute = false;
+  Map<String, dynamic>? _pendingNotificationPopup;
 
   final List<String> _categories = [
     'All',
@@ -33,12 +41,150 @@ class _RemindersScreenState extends State<RemindersScreen> {
   void initState() {
     super.initState();
     _loadReminders();
+    _loadNotificationPreference();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_checkedNotificationRoute) return;
+    _checkedNotificationRoute = true;
+
+    final arguments = ModalRoute.of(context)?.settings.arguments;
+    if (arguments is Map) {
+      _pendingNotificationPopup = Map<String, dynamic>.from(arguments);
+      _showPendingNotificationPopup();
+    }
+  }
+
+  Future<void> _loadNotificationPreference() async {
+    final enabled = await ReminderNotificationService.instance.isEnabled();
+    if (mounted) setState(() => _notificationsEnabled = enabled);
+  }
+
+  Future<void> _toggleNotifications() async {
+    if (_updatingNotificationSetting) return;
+    final wasEnabled = _notificationsEnabled;
+    setState(() => _updatingNotificationSetting = true);
+
+    final enabled = await ReminderNotificationService.instance
+        .setEnabled(!_notificationsEnabled);
+
+    if (!mounted) return;
+    setState(() {
+      _notificationsEnabled = enabled;
+      _updatingNotificationSetting = false;
+    });
+
+    showAppSnackBar(
+      context,
+      enabled
+          ? 'Reminder notifications are on.'
+          : (wasEnabled
+              ? 'Reminder notifications are off.'
+              : 'Allow notifications in your device or browser settings to receive alerts.'),
+      type: enabled ? SnackBarType.success : SnackBarType.info,
+    );
+  }
+
+  Widget _buildNotificationControlCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.getSurfaceCard(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.getBorder(context)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _notificationsEnabled
+                  ? const Color(0xFF10B981).withValues(alpha: 0.14)
+                  : (isDark ? AppColors.bgDark : AppColors.primaryLight),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              _notificationsEnabled
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_off_outlined,
+              color: AppColors.primary,
+              size: 21,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Reminder notifications',
+                  style: TextStyle(
+                    color: AppColors.getTextPrimary(context),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _notificationsEnabled
+                      ? 'Alerts are enabled for upcoming reminders.'
+                      : 'Get alerts for payment and stock reminders.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.getTextSecondary(context),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _updatingNotificationSetting
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : TextButton(
+                  onPressed: _toggleNotifications,
+                  child: Text(_notificationsEnabled ? 'Turn off' : 'Enable'),
+                ),
+        ],
+      ),
+    );
+  }
+
+  void _showPendingNotificationPopup() {
+    final requestedReminder = _pendingNotificationPopup;
+    if (_isLoading || requestedReminder == null) return;
+
+    _pendingNotificationPopup = null;
+    final requestedId = requestedReminder['id']?.toString();
+    var reminderToShow = requestedReminder;
+    for (final reminder in _reminders) {
+      if (reminder['id']?.toString() == requestedId) {
+        reminderToShow = reminder;
+        break;
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
+        context: context,
+        builder: (_) => ReminderNotificationPopup(reminder: reminderToShow),
+      );
+    });
   }
 
   Future<void> _loadReminders() async {
     setState(() => _isLoading = true);
 
-    // 1. Load user custom reminders (and purge any old static demo items rem_1..rem_4)
     List<Map<String, dynamic>> userReminders = [];
     final prefs = await SharedPreferences.getInstance();
     final jsonStr = prefs.getString('saved_reminders_list');
@@ -46,19 +192,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
     if (jsonStr != null && jsonStr.isNotEmpty) {
       try {
         final List decoded = jsonDecode(jsonStr);
-        userReminders = List<Map<String, dynamic>>.from(decoded).where((r) {
-          final id = r['id']?.toString() ?? '';
-          return !id.startsWith('rem_') || int.tryParse(id.replaceAll('rem_', '')) == null;
-        }).toList();
+        userReminders = List<Map<String, dynamic>>.from(
+          decoded.map((item) => Map<String, dynamic>.from(item)),
+        ).where((reminder) => reminder['is_api'] != true).toList();
       } catch (_) {
         userReminders = [];
       }
     }
 
-    // 2. Dynamic Reminders List
     List<Map<String, dynamic>> dynamicReminders = [];
 
-    // A. Fetch real-time overdue bill reminders (>10 days) from API
     try {
       final fetchedApi = await InvoiceService.fetchOverdueReminders(days: 10);
       final apiReminders = fetchedApi.map((item) {
@@ -86,7 +229,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
       debugPrint('Error fetching API reminders: $e');
     }
 
-    // B. Dynamically generate Low Stock alerts from real Inventory API
     try {
       final inventoryItems = await InventoryService.fetchInventory();
       final todayStr = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
@@ -112,7 +254,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
       debugPrint('Error fetching low stock reminders: $e');
     }
 
-    // 3. Merge dynamic reminders with user custom reminders without duplication
     final existingIds = userReminders.map((r) => r['id']).toSet();
     final uniqueDynamicReminders = dynamicReminders.where((r) => !existingIds.contains(r['id'])).toList();
 
@@ -121,12 +262,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
     if (mounted) {
       setState(() => _isLoading = false);
+      _showPendingNotificationPopup();
     }
   }
 
   Future<void> _saveReminders() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('saved_reminders_list', jsonEncode(_reminders));
+    await ReminderNotificationService.instance.syncReminders(_reminders);
   }
 
   @override
@@ -174,11 +317,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
     });
     await _saveReminders();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Reminder deleted.'),
-          backgroundColor: AppColors.primary,
-        ),
+      showAppSnackBar(
+        context,
+        'Reminder deleted successfully.',
+        type: SnackBarType.success,
       );
     }
   }
@@ -189,7 +331,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
     String category = 'Payment Due';
     String priority = 'High';
     DateTime selectedDate = DateTime.now();
-    TimeOfDay selectedTime = TimeOfDay.now();
+    TimeOfDay selectedTime = TimeOfDay.fromDateTime(
+      DateTime.now().add(const Duration(minutes: 1)),
+    );
 
     showModalBottomSheet(
       context: context,
@@ -208,9 +352,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 right: 24,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: AppColors.getSurfaceCard(context),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -222,7 +366,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: AppColors.border,
+                          color: AppColors.getBorder(context),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -231,16 +375,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Add New Reminder',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: AppColors.getTextPrimary(context),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded),
+                          icon: Icon(Icons.close_rounded, color: AppColors.getTextSecondary(context)),
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
@@ -248,10 +392,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: titleCtrl,
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: AppColors.getTextPrimary(context)),
+                      decoration: InputDecoration(
                         labelText: 'Reminder Title *',
                         hintText: 'e.g. Call customer for payment due',
-                        prefixIcon: Icon(Icons.title_rounded),
+                        hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7)),
+                        prefixIcon: const Icon(Icons.title_rounded),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -259,7 +405,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: category,
+                            value: category,
+                            dropdownColor: AppColors.getSurfaceCard(context),
+                            style: TextStyle(color: AppColors.getTextPrimary(context)),
                             decoration: const InputDecoration(
                               labelText: 'Category',
                               prefixIcon: Icon(Icons.category_outlined),
@@ -276,7 +424,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: priority,
+                            value: priority,
+                            dropdownColor: AppColors.getSurfaceCard(context),
+                            style: TextStyle(color: AppColors.getTextPrimary(context)),
                             decoration: const InputDecoration(
                               labelText: 'Priority',
                               prefixIcon: Icon(Icons.flag_outlined),
@@ -312,7 +462,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                                 labelText: 'Due Date',
                                 prefixIcon: Icon(Icons.calendar_today_outlined),
                               ),
-                              child: Text(dateStr, style: const TextStyle(fontSize: 13)),
+                              child: Text(dateStr, style: TextStyle(fontSize: 13, color: AppColors.getTextPrimary(context))),
                             ),
                           ),
                         ),
@@ -334,7 +484,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                                 prefixIcon: Icon(Icons.access_time_rounded),
                               ),
                               child: Text(selectedTime.format(context),
-                                  style: const TextStyle(fontSize: 13)),
+                                  style: TextStyle(fontSize: 13, color: AppColors.getTextPrimary(context))),
                             ),
                           ),
                         ),
@@ -344,10 +494,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     TextField(
                       controller: notesCtrl,
                       maxLines: 2,
-                      decoration: const InputDecoration(
+                      style: TextStyle(color: AppColors.getTextPrimary(context)),
+                      decoration: InputDecoration(
                         labelText: 'Notes / Contact Info',
                         hintText: 'e.g. Contact phone number or specific instructions',
-                        prefixIcon: Icon(Icons.notes_rounded),
+                        hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7)),
+                        prefixIcon: const Icon(Icons.notes_rounded),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -396,7 +548,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.getScaffoldBg(context),
+      drawer: const AppSidebarDrawer(),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primary,
         onPressed: () => _showAddReminderModal(context),
@@ -423,6 +576,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _buildNotificationControlCard(),
+                          const SizedBox(height: 16),
                           _buildMetricsGrid(),
                           const SizedBox(height: 20),
                           _buildSearchAndFilters(),
@@ -449,18 +604,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+          colors: [Color(0xFF073822), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: Colors.white, size: 20),
-            onPressed: () => Navigator.maybePop(context),
-          ),
+          const AppSidebarButton(),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -475,14 +626,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 ),
                 Text(
                   'Payment due dates, stock alerts & follow-ups',
-                  style: TextStyle(color: Color(0xFFBFDBFE), fontSize: 12),
+                  style: TextStyle(color: Color(0xFFE6F4EA), fontSize: 12),
                 ),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _loadReminders,
           ),
         ],
       ),
@@ -492,10 +639,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
   // ─── METRICS GRID ──────────────────────────────────────────────────────────
   Widget _buildMetricsGrid() {
     final stats = [
-      _RemStat('Due Today', '$_dueTodayCount', Icons.today_rounded, const Color(0xFFEF4444), const Color(0xFFFEF2F2)),
-      _RemStat('Total Pending', '$_pendingTotalCount', Icons.pending_actions_rounded, const Color(0xFFF59E0B), const Color(0xFFFEF3C7)),
-      _RemStat('Completed', '$_completedTotalCount', Icons.task_alt_rounded, const Color(0xFF10B981), const Color(0xFFECFDF5)),
-      _RemStat('All Tasks', '${_reminders.length}', Icons.format_list_bulleted_rounded, const Color(0xFF2563EB), const Color(0xFFEFF6FF)),
+      _RemStat('Due Today', '$_dueTodayCount', Icons.today_rounded, const Color(0xFFEF4444), const Color(0xFFEF4444).withValues(alpha: 0.15)),
+      _RemStat('Total Pending', '$_pendingTotalCount', Icons.pending_actions_rounded, const Color(0xFFF59E0B), const Color(0xFFF59E0B).withValues(alpha: 0.15)),
+      _RemStat('Completed', '$_completedTotalCount', Icons.task_alt_rounded, const Color(0xFF10B981), const Color(0xFF10B981).withValues(alpha: 0.15)),
+      _RemStat('All Tasks', '${_reminders.length}', Icons.format_list_bulleted_rounded, AppColors.primary, AppColors.primaryLight),
     ];
 
     return LayoutBuilder(builder: (context, constraints) {
@@ -516,9 +663,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -554,9 +701,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
               const SizedBox(height: 2),
               Text(
                 s.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textSecondary,
+                  color: AppColors.getTextSecondary(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -573,9 +720,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.getSurfaceCard(context),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.getBorder(context)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
@@ -587,17 +734,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
           child: TextField(
             controller: _searchController,
             onChanged: (v) => setState(() => _searchQuery = v),
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            style: TextStyle(color: AppColors.getTextPrimary(context), fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Search reminders by title or notes...',
               hintStyle:
-                  const TextStyle(color: AppColors.textMuted, fontSize: 13),
-              prefixIcon: const Icon(Icons.search_rounded,
-                  color: AppColors.textSecondary, size: 20),
+                  TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7), fontSize: 13),
+              prefixIcon: Icon(Icons.search_rounded,
+                  color: AppColors.getTextSecondary(context), size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: AppColors.textSecondary, size: 18),
+                      icon: Icon(Icons.close_rounded,
+                          color: AppColors.getTextSecondary(context), size: 18),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
@@ -628,16 +775,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: isSel ? Colors.white : AppColors.textSecondary,
+                      color: isSel ? Colors.white : AppColors.getTextSecondary(context),
                     ),
                   ),
                   selected: isSel,
                   selectedColor: AppColors.primary,
-                  backgroundColor: Colors.white,
+                  backgroundColor: AppColors.getSurfaceCard(context),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
                     side: BorderSide(
-                      color: isSel ? Colors.transparent : AppColors.border,
+                      color: isSel ? Colors.transparent : AppColors.getBorder(context),
                     ),
                   ),
                   onSelected: (_) => setState(() => _selectedCategory = cat),
@@ -671,18 +818,18 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     size: 32, color: AppColors.primary),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'No reminders found',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
-                  color: AppColors.textPrimary,
+                  color: AppColors.getTextPrimary(context),
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Add a new reminder to stay organized.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context)),
               ),
             ],
           ),
@@ -697,10 +844,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             'Reminders (${list.length})',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.getTextPrimary(context),
             ),
           ),
         ),
@@ -732,14 +879,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
       final isSuccess = res['success'] == true;
       if (isSuccess) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res['message']?.toString() ?? 'Reminder sent successfully.'),
-            backgroundColor: const Color(0xFF10B981),
-          ),
+        showAppSnackBar(
+          context,
+          res['message']?.toString() ?? 'Reminder sent successfully.',
+          type: SnackBarType.success,
         );
       } else {
-        // SMS Fallback if API returns 500 or is unhandled
         final rawPhone = (phone ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
         bool launched = false;
         if (rawPhone.isNotEmpty) {
@@ -752,13 +897,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
         }
 
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(launched
-                ? 'Opening SMS app to send payment reminder...'
-                : (res['message']?.toString() ?? 'Reminder notification sent.')),
-            backgroundColor: AppColors.primary,
-          ),
+        showAppSnackBar(
+          context,
+          launched
+              ? 'Opening SMS app to send payment reminder...'
+              : (res['message']?.toString() ?? 'Reminder notification sent.'),
+          type: SnackBarType.info,
         );
       }
     }
@@ -785,9 +929,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
             return Container(
               padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: AppColors.getSurfaceCard(context),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -798,7 +942,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.border,
+                        color: AppColors.getBorder(context),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -810,8 +954,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: category == 'Payment Due'
-                              ? const Color(0xFFFEF2F2)
-                              : const Color(0xFFEFF6FF),
+                              ? const Color(0xFFEF4444).withValues(alpha: 0.15)
+                              : AppColors.primaryLight,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -829,7 +973,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -843,7 +987,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       ),
                       const Spacer(),
                       IconButton(
-                        icon: const Icon(Icons.close_rounded),
+                        icon: Icon(Icons.close_rounded, color: AppColors.getTextSecondary(context)),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
@@ -851,46 +995,46 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   const SizedBox(height: 14),
                   Text(
                     rem['title'] ?? '',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: AppColors.getTextPrimary(context),
                     ),
                   ),
                   if (rem['notes'] != null && rem['notes'].toString().isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       rem['notes'].toString(),
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 13, color: AppColors.getTextSecondary(context)),
                     ),
                   ],
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: AppColors.getScaffoldBg(context),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(color: AppColors.getBorder(context)),
                     ),
                     child: Column(
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.textSecondary),
+                            Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.getTextSecondary(context)),
                             const SizedBox(width: 8),
-                            const Text('Due Date: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            Text('Due Date: ', style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context))),
                             Text('${rem['due_date']} ${rem['time'] ?? ''}',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context))),
                           ],
                         ),
                         if (phone != null && phone.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.phone_outlined, size: 16, color: AppColors.textSecondary),
+                              Icon(Icons.phone_outlined, size: 16, color: AppColors.getTextSecondary(context)),
                               const SizedBox(width: 8),
-                              const Text('Phone: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              Text(phone, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                              Text('Phone: ', style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context))),
+                              Text(phone, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context))),
                             ],
                           ),
                         ],
@@ -898,10 +1042,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(Icons.email_outlined, size: 16, color: AppColors.textSecondary),
+                              Icon(Icons.email_outlined, size: 16, color: AppColors.getTextSecondary(context)),
                               const SizedBox(width: 8),
-                              const Text('Email: ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                              Text(email, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                              Text('Email: ', style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context))),
+                              Text(email, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context))),
                             ],
                           ),
                         ],
@@ -915,7 +1059,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
+                              backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 13),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -944,7 +1088,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       ],
                       IconButton(
                         style: IconButton.styleFrom(
-                          backgroundColor: isDone ? const Color(0xFFFEF3C7) : const Color(0xFFECFDF5),
+                          backgroundColor: isDone ? const Color(0xFFF59E0B).withValues(alpha: 0.15) : const Color(0xFF10B981).withValues(alpha: 0.15),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () {
@@ -960,7 +1104,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       const SizedBox(width: 8),
                       IconButton(
                         style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFFEF2F2),
+                          backgroundColor: AppColors.error.withValues(alpha: 0.15),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: () {
@@ -990,15 +1134,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
         ? const Color(0xFFDC2626)
         : priority == 'Medium'
             ? const Color(0xFFD97706)
-            : const Color(0xFF2563EB);
+            : AppColors.primary;
 
     final Color categoryBg = category == 'Payment Due'
-        ? const Color(0xFFFEF2F2)
+        ? const Color(0xFFEF4444).withValues(alpha: 0.15)
         : category == 'Stock Reorder'
-            ? const Color(0xFFFEF3C7)
+            ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
             : category == 'Customer Service'
-                ? const Color(0xFFECFDF5)
-                : const Color(0xFFEFF6FF);
+                ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                : AppColors.primaryLight;
 
     final Color categoryColor = category == 'Payment Due'
         ? const Color(0xFFDC2626)
@@ -1006,14 +1150,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
             ? const Color(0xFFD97706)
             : category == 'Customer Service'
                 ? const Color(0xFF059669)
-                : const Color(0xFF2563EB);
+                : AppColors.primary;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDone ? const Color(0xFFF8FAFC) : Colors.white,
+        color: isDone ? AppColors.getScaffoldBg(context) : AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDone ? AppColors.border.withValues(alpha: 0.6) : AppColors.border,
+          color: isDone ? AppColors.getBorder(context).withValues(alpha: 0.6) : AppColors.getBorder(context),
         ),
         boxShadow: isDone
             ? []
@@ -1087,7 +1231,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: isDone ? AppColors.textMuted : AppColors.textPrimary,
+                          color: isDone ? AppColors.getTextSecondary(context) : AppColors.getTextPrimary(context),
                           decoration: isDone ? TextDecoration.lineThrough : null,
                         ),
                       ),
@@ -1097,21 +1241,21 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           rem['notes'],
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDone ? AppColors.textMuted : AppColors.textSecondary,
+                            color: AppColors.getTextSecondary(context),
                           ),
                         ),
                       ],
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          const Icon(Icons.calendar_today_outlined,
-                              size: 12, color: AppColors.textSecondary),
+                          Icon(Icons.calendar_today_outlined,
+                              size: 12, color: AppColors.getTextSecondary(context)),
                           const SizedBox(width: 4),
                           Text(
                             'Due: ${rem['due_date']} ${rem['time'] ?? ''}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.textSecondary,
+                              color: AppColors.getTextSecondary(context),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1120,7 +1264,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 20),
+                Icon(Icons.chevron_right_rounded, color: AppColors.getTextSecondary(context), size: 20),
               ],
             ),
           ),
@@ -1129,6 +1273,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 }
+
 
 class _RemStat {
   const _RemStat(this.title, this.value, this.icon, this.color, this.bgColor);

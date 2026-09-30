@@ -3,6 +3,8 @@ import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/customer_service.dart';
 import 'package:maharashtra_tyres/screens/add_customer_screen.dart';
+import 'package:maharashtra_tyres/screens/edit_customer_screen.dart';
+import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 
 class CustomersScreen extends StatefulWidget {
   const CustomersScreen({super.key});
@@ -70,6 +72,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
       builder: (context, currentLang, child) {
         return Scaffold(
           backgroundColor: AppColors.background,
+          drawer: const AppSidebarDrawer(),
           body: Column(
             children: [
               _buildTopBar(context),
@@ -121,35 +124,28 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
-        bottom: 14,
+        bottom: 16,
         left: 8,
         right: 20,
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E40AF), Color(0xFF2563EB)],
+          colors: [Color(0xFF073822), Color(0xFF0F5132)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
+          const AppSidebarButton(),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(LanguageService.tr('customers'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-                Text(LanguageService.tr('customer_list'), style: const TextStyle(color: Color(0xFFBFDBFE), fontSize: 12)),
+                Text(LanguageService.tr('customer_list'), style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 12)),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _loadCustomers,
           ),
         ],
       ),
@@ -166,7 +162,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
         .toSet();
 
     final stats = [
-      _StatItem(LanguageService.tr('total_customers'), '${_customers.length}', Icons.people_alt_rounded, const Color(0xFF2563EB), const Color(0xFFEFF6FF)),
+      _StatItem(LanguageService.tr('total_customers'), '${_customers.length}', Icons.people_alt_rounded, AppColors.primary, AppColors.primaryLight),
       _StatItem('Active', '$activeCount', Icons.check_circle_outline_rounded, const Color(0xFF10B981), const Color(0xFFECFDF5)),
       _StatItem('Inactive', '$inactiveCount', Icons.cancel_outlined, const Color(0xFFEF4444), const Color(0xFFFEF2F2)),
       _StatItem('Unique Cities', '${cities.length}', Icons.location_city_rounded, const Color(0xFF8B5CF6), const Color(0xFFF5F3FF)),
@@ -178,7 +174,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
         crossAxisCount: cols,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: cols == 4 ? 1.8 : 1.6,
+        // Keep enough vertical room for the icon, value, and label on narrow screens.
+        childAspectRatio: 1.4,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         children: stats.map((s) => _buildStatCard(s)).toList(),
@@ -187,12 +184,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildStatCard(_StatItem s) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
         ],
@@ -204,14 +202,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
           Container(
             width: 34,
             height: 34,
-            decoration: BoxDecoration(color: s.bgColor, borderRadius: BorderRadius.circular(9)),
+            decoration: BoxDecoration(color: isDark ? AppColors.bgDark : s.bgColor, borderRadius: BorderRadius.circular(10)),
             child: Icon(s.icon, color: s.iconColor, size: 18),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(s.value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: s.iconColor)),
-              Text(s.label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+              Text(s.label, style: TextStyle(fontSize: 11, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontWeight: FontWeight.w500)),
             ],
           ),
         ],
@@ -220,13 +218,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildSearchAndFilter() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border),
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
             boxShadow: [
               BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
             ],
@@ -234,14 +233,14 @@ class _CustomersScreenState extends State<CustomersScreen> {
           child: TextField(
             controller: _searchController,
             onChanged: (v) => setState(() => _searchQuery = v),
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            style: TextStyle(color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight, fontSize: 14),
             decoration: InputDecoration(
               hintText: LanguageService.tr('search_customers'),
-              hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
+              hintStyle: TextStyle(color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight, fontSize: 13),
+              prefixIcon: Icon(Icons.search_rounded, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 18),
+                      icon: Icon(Icons.close_rounded, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, size: 18),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
@@ -271,13 +270,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      gradient: selected
-                          ? const LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF7C3AED)])
-                          : null,
-                      color: selected ? null : Colors.white,
+                      color: selected ? AppColors.primary : (isDark ? AppColors.surfaceDark : Colors.white),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: selected ? Colors.transparent : AppColors.border,
+                        color: selected ? Colors.transparent : (isDark ? AppColors.borderDark : AppColors.borderLight),
                       ),
                     ),
                     child: Text(
@@ -285,7 +281,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: selected ? Colors.white : AppColors.textSecondary,
+                        color: selected ? Colors.white : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                       ),
                     ),
                   ),
@@ -300,6 +296,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Widget _buildCustomerList() {
     final list = _filteredCustomers;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (list.isEmpty) {
       return _buildEmptyState();
@@ -312,7 +309,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
             '${list.length} customer${list.length == 1 ? '' : 's'} found',
-            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 13, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight, fontWeight: FontWeight.w500),
           ),
         ),
         ListView.separated(
@@ -327,6 +324,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildCustomerCard(Map<String, dynamic> customer) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final status = customer['status']?.toString().toLowerCase() ?? 'active';
     final bool isActive = status == 'active';
     final String initials = customer['name'] != null && customer['name'].toString().isNotEmpty
@@ -335,18 +333,18 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.borderDark : AppColors.borderLight),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 3)),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           onTap: () => _showCustomerDetail(customer),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -357,7 +355,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   height: 50,
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                      colors: [Color(0xFF0F5132), Color(0xFF10B981)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -366,7 +364,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   child: Center(
                     child: Text(
                       initials,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                   ),
                 ),
@@ -380,7 +378,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                           Expanded(
                             child: Text(
                               customer['name'] ?? 'Unnamed',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -405,20 +403,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.phone_outlined, size: 12, color: AppColors.textSecondary),
+                          Icon(Icons.phone_outlined, size: 12, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                           const SizedBox(width: 4),
-                          Text(customer['phone'] ?? 'No Phone', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          Text(customer['phone'] ?? 'No Phone', style: TextStyle(fontSize: 12, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
                           const SizedBox(width: 12),
-                          const Icon(Icons.location_city_outlined, size: 12, color: AppColors.textSecondary),
+                          Icon(Icons.location_city_outlined, size: 12, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                           const SizedBox(width: 4),
-                          Text(customer['city'] ?? 'No City', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          Text(customer['city'] ?? 'No City', style: TextStyle(fontSize: 12, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
                         ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 20),
+                Icon(Icons.chevron_right_rounded, color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight, size: 20),
               ],
             ),
           ),
@@ -428,6 +426,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 60),
@@ -437,15 +436,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.primaryLight,
+                color: isDark ? AppColors.surfaceDark : AppColors.primaryLight,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.people_outline_rounded, size: 40, color: AppColors.primary),
             ),
             const SizedBox(height: 16),
-            Text(LanguageService.tr('no_customers_found'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary)),
+            Text(LanguageService.tr('no_customers_found'), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)),
             const SizedBox(height: 6),
-            const Text('Try adjusting your search or filters', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            Text('Try adjusting your search or filters', style: TextStyle(fontSize: 13, color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight)),
           ],
         ),
       ),
@@ -464,6 +463,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     );
   }
 }
+
 
 class _CustomerDetailSheet extends StatefulWidget {
   const _CustomerDetailSheet({required this.customer, required this.onRefreshNeeded});
@@ -623,7 +623,7 @@ class _CustomerDetailSheetState extends State<_CustomerDetailSheet> {
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AddCustomerScreen(customer: widget.customer),
+                          builder: (_) => EditCustomerScreen(customer: widget.customer),
                         ),
                       );
                       if (result == true) {
