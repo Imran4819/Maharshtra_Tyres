@@ -71,7 +71,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (context, currentLang, child) {
         return Scaffold(
           backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-          drawer: const AppSidebarDrawer(),
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppColors.primary,
             onPressed: () async {

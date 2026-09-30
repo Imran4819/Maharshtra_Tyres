@@ -80,7 +80,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context, currentLang, child) {
         return Scaffold(
           backgroundColor: AppColors.getScaffoldBg(context),
-          drawer: const AppSidebarDrawer(),
           body: Column(
             children: [
               _buildTopHeader(context),

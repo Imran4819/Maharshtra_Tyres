@@ -737,7 +737,6 @@ class _AddInvoiceScreenState extends State<AddInvoiceScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.getScaffoldBg(context),
-      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           _buildTopBar(context),

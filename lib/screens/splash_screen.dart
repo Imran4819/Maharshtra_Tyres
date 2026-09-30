@@ -12,25 +12,19 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
-  late final AnimationController _rotationController;
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
   late final AnimationController _progressController;
   late final Animation<double> _progressAnimation;
   late final AnimationController _fadeController;
   late final Animation<double> _fadeAnimation;
-  
+
   Timer? _navigationTimer;
   bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
-
-    // Rotation animation for the tyre wheel
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
 
     // Progress bar animation (2.5 seconds)
     _progressController = AnimationController(
@@ -67,11 +61,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     if (!mounted) return;
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('is_logged_in') ?? false;
-    
+
     if (!mounted) return;
     if (isLoggedIn) {
-      final initialReminder =
-          ReminderNotificationService.instance.takeInitialNotification();
+      final initialReminder = ReminderNotificationService.instance
+          .takeInitialNotification();
       if (initialReminder != null) {
         Navigator.pushReplacementNamed(
           context,
@@ -89,7 +83,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void dispose() {
     _navigationTimer?.cancel();
-    _rotationController.dispose();
     _progressController.dispose();
     _fadeController.dispose();
     super.dispose();
@@ -97,15 +90,10 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
   Widget _buildTyreWheel() {
     return Container(
-      width: 140,
-      height: 140,
+      width: 156,
+      height: 156,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF041C12),
-        border: Border.all(
-          color: AppColors.primaryAccent,
-          width: 16,
-        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.primaryAccent.withValues(alpha: 0.35),
@@ -115,52 +103,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           ),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Inner alloy rim
-          Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.transparent,
-              border: Border.all(
-                color: const Color(0xFFA7F3D0),
-                width: 3.5,
-              ),
-            ),
-          ),
-          // Spokes
-          ...List.generate(6, (index) {
-            final angle = (index * 60) * 3.14159265 / 180;
-            return Transform.rotate(
-              angle: angle,
-              child: Container(
-                width: 5,
-                height: 92,
-                color: const Color(0xFF6EE7B7),
-              ),
-            );
-          }),
-          // Center hub cap
-          Container(
-            width: 24,
-            height: 24,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Color(0xFF0F5132),
-            ),
-          ),
-          Container(
-            width: 10,
-            height: 10,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-            ),
-          ),
-        ],
+      child: ClipOval(
+        child: Image.asset('lib/widgets/maha_tyre_logo.png', fit: BoxFit.cover),
       ),
     );
   }
@@ -217,10 +161,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // Spinning Tyre Logo
-                      RotationTransition(
-                        turns: _rotationController,
-                        child: _buildTyreWheel(),
-                      ),
+                      _buildTyreWheel(),
                       const SizedBox(height: 40),
                       // App Logo Text
                       Text(
@@ -270,7 +211,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                                         borderRadius: BorderRadius.circular(10),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: AppColors.primaryAccent.withValues(alpha: 0.6),
+                                            color: AppColors.primaryAccent
+                                                .withValues(alpha: 0.6),
                                             blurRadius: 8,
                                             offset: const Offset(0, 2),
                                           ),

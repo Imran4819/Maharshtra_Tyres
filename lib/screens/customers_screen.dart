@@ -72,7 +72,6 @@ class _CustomersScreenState extends State<CustomersScreen> {
       builder: (context, currentLang, child) {
         return Scaffold(
           backgroundColor: AppColors.background,
-          drawer: const AppSidebarDrawer(),
           body: Column(
             children: [
               _buildTopBar(context),

@@ -116,14 +116,13 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Color(0xFF073822),
-                    Color(0xFF0F5132),
-                  ],
+                  colors: [Color(0xFF073822), Color(0xFF0F5132)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(36)),
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(36),
+                ),
               ),
               child: SafeArea(
                 child: Padding(
@@ -140,7 +139,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.white.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.directions_car_filled_rounded, color: Colors.white, size: 24),
+                            child: const Icon(
+                              Icons.directions_car_filled_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Text(
@@ -164,17 +167,19 @@ class _LoginScreenState extends State<LoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: isDesktop ? 480 : 440,
-                ),
+                constraints: BoxConstraints(maxWidth: isDesktop ? 480 : 440),
                 child: Container(
                   margin: const EdgeInsets.only(top: 60),
                   padding: const EdgeInsets.all(28),
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                    color: isDark
+                        ? AppColors.surfaceDark
+                        : AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(
-                      color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                      color: isDark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight,
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -199,10 +204,12 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: const Icon(
-                              Icons.lock_person_rounded,
-                              size: 32,
-                              color: AppColors.primary,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.asset(
+                                'lib/widgets/maha_tyre_logo.png',
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
                         ),
@@ -213,7 +220,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -223,7 +232,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                         const SizedBox(height: 28),
@@ -232,11 +243,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _identifierController,
                           textInputAction: TextInputAction.next,
                           keyboardType: TextInputType.emailAddress,
-                          autofillHints: const [AutofillHints.username, AutofillHints.email],
+                          autofillHints: const [
+                            AutofillHints.username,
+                            AutofillHints.email,
+                          ],
                           decoration: InputDecoration(
                             labelText: LanguageService.tr('email_or_phone'),
                             hintText: 'Enter email or 10-digit number',
-                            prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+                            prefixIcon: const Icon(
+                              Icons.person_outline_rounded,
+                              size: 20,
+                            ),
                           ),
                           validator: _validateIdentifier,
                         ),
@@ -250,7 +267,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             labelText: LanguageService.tr('password'),
                             hintText: 'Enter your password',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 20,
+                            ),
                             suffixIcon: IconButton(
                               onPressed: () {
                                 setState(() {
@@ -289,7 +309,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             Text(
                               LanguageService.tr('remember_me'),
                               style: TextStyle(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13,
                               ),
@@ -299,7 +321,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Password recovery instructions sent.'),
+                                    content: Text(
+                                      'Password recovery instructions sent.',
+                                    ),
                                   ),
                                 );
                               },
@@ -327,7 +351,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     height: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
                                     ),
                                   )
                                 : Text(LanguageService.tr('login')),
@@ -339,11 +365,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             const Expanded(child: Divider()),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
                               child: Text(
                                 'or continue with',
                                 style: TextStyle(
-                                  color: isDark ? AppColors.textMutedDark : AppColors.textMutedLight,
+                                  color: isDark
+                                      ? AppColors.textMutedDark
+                                      : AppColors.textMutedLight,
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -360,7 +390,11 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: () {
                               Navigator.pushNamed(context, '/otp-login');
                             },
-                            icon: const Icon(Icons.sms_outlined, color: AppColors.primary, size: 20),
+                            icon: const Icon(
+                              Icons.sms_outlined,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                             label: Text(
                               LanguageService.tr('login_with_otp'),
                               style: const TextStyle(
@@ -380,7 +414,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               LanguageService.tr('dont_have_account'),
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
                               ),
                             ),
                             TextButton(

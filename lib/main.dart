@@ -10,6 +10,7 @@ import 'package:maharashtra_tyres/screens/add_invoice_screen.dart';
 import 'package:maharashtra_tyres/screens/edit_invoice_screen.dart';
 import 'package:maharashtra_tyres/screens/customers_screen.dart';
 import 'package:maharashtra_tyres/screens/dashboard_screen.dart';
+import 'package:maharashtra_tyres/screens/bills_screen.dart';
 import 'package:maharashtra_tyres/screens/inventory_screen.dart';
 import 'package:maharashtra_tyres/screens/invoices_screen.dart';
 import 'package:maharashtra_tyres/screens/login_screen.dart';
@@ -69,6 +70,7 @@ class MaharashtraTyresApp extends StatelessWidget {
                 '/otp-login': (_) => const OtpLoginScreen(),
                 '/otp-verify': (_) => const OtpVerifyScreen(),
                 '/dashboard': (_) => const DashboardScreen(),
+                '/bills': (_) => const BillsScreen(),
                 '/customers': (_) => const CustomersScreen(),
                 '/add-customer': (_) => const AddCustomerScreen(),
                 '/edit-customer': (_) => const EditCustomerScreen(),

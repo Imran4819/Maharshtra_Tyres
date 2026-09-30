@@ -6,9 +6,26 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 final ValueNotifier<String?> appCurrentRoute = ValueNotifier<String?>(null);
 
 class AppNavigationObserver extends NavigatorObserver {
+  String? _pendingRouteName;
+  bool _routeUpdateScheduled = false;
+
   void _setCurrentRoute(Route<dynamic>? route) {
     final routeName = route?.settings.name;
-    if (routeName != null) appCurrentRoute.value = routeName;
+    if (routeName == null) return;
+
+    _pendingRouteName = routeName;
+    if (_routeUpdateScheduled) return;
+
+    _routeUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _routeUpdateScheduled = false;
+      final currentRouteName = _pendingRouteName;
+      _pendingRouteName = null;
+      if (currentRouteName != null &&
+          appCurrentRoute.value != currentRouteName) {
+        appCurrentRoute.value = currentRouteName;
+      }
+    });
   }
 
   @override
@@ -28,7 +45,11 @@ class AppNavigationObserver extends NavigatorObserver {
 }
 
 class AppNavigationShell extends StatelessWidget {
-  const AppNavigationShell({super.key, required this.routeName, required this.child});
+  const AppNavigationShell({
+    super.key,
+    required this.routeName,
+    required this.child,
+  });
 
   final String? routeName;
   final Widget child;
@@ -47,6 +68,7 @@ class AppNavigationShell extends StatelessWidget {
     '/inventory',
     '/add-inventory',
     '/edit-inventory',
+    '/bills',
     '/sales',
     '/invoices',
     '/add-invoice',
@@ -61,11 +83,8 @@ class AppNavigationShell extends StatelessWidget {
     if (!_authenticatedRoutes.contains(routeName)) {
       return child;
     }
-    if (media.size.width < desktopBreakpoint) {
-      return _NavigationSidebarScope(
-        hasPersistentSidebar: false,
-        child: child,
-      );
+    if (media.size.width < desktopBreakpoint || routeName != '/dashboard') {
+      return _NavigationSidebarScope(hasPersistentSidebar: false, child: child);
     }
 
     return Row(
@@ -97,7 +116,8 @@ class AppSidebarDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Drawer(
       child: AppSidebarPanel(
-        routeName: ModalRoute.of(context)?.settings.name ?? appCurrentRoute.value,
+        routeName:
+            ModalRoute.of(context)?.settings.name ?? appCurrentRoute.value,
         isDrawer: true,
       ),
     );
@@ -114,15 +134,34 @@ class AppSidebarButton extends StatelessWidget {
     if (_NavigationSidebarScope.hasPersistentSidebarInTree(context)) {
       return const SizedBox.shrink();
     }
+    final routeName =
+        ModalRoute.of(context)?.settings.name ?? appCurrentRoute.value;
+    final isDashboard = routeName == '/dashboard';
     return Padding(
       padding: const EdgeInsets.only(right: 12),
       child: Builder(
         builder: (scaffoldContext) => IconButton(
-          tooltip: 'Open navigation menu',
+          tooltip: isDashboard ? 'Open navigation menu' : 'Go back',
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints.tightFor(width: 40, height: 48),
-          icon: Icon(Icons.menu_rounded, color: color, size: 23),
-          onPressed: () => Scaffold.of(scaffoldContext).openDrawer(),
+          icon: Icon(
+            isDashboard ? Icons.menu_rounded : Icons.arrow_back_rounded,
+            color: color,
+            size: 23,
+          ),
+          onPressed: () {
+            if (isDashboard) {
+              Scaffold.of(scaffoldContext).openDrawer();
+              return;
+            }
+            final navigator = appNavigatorKey.currentState;
+            if (navigator == null) return;
+            if (navigator.canPop()) {
+              navigator.pop();
+            } else {
+              navigator.pushNamedAndRemoveUntil('/dashboard', (_) => false);
+            }
+          },
         ),
       ),
     );
@@ -160,11 +199,20 @@ class AppSidebarPanel extends StatelessWidget {
     _SidebarDestination(Icons.inventory_2_outlined, 'Inventory', '/inventory'),
     _SidebarDestination(Icons.shopping_cart_outlined, 'Sales', '/sales'),
     _SidebarDestination(Icons.receipt_long_outlined, 'Invoices', '/invoices'),
+    _SidebarDestination(Icons.receipt_outlined, 'Bills', '/bills'),
     _SidebarDestination(Icons.alarm_outlined, 'Reminders', '/reminders'),
     _SidebarDestination(Icons.bar_chart_outlined, 'Reports', '/sales'),
-    _SidebarDestination(Icons.account_balance_wallet_outlined, 'Revenue', '/sales'),
+    _SidebarDestination(
+      Icons.account_balance_wallet_outlined,
+      'Revenue',
+      '/sales',
+    ),
     _SidebarDestination(Icons.local_shipping_outlined, 'Suppliers', null),
-    _SidebarDestination(Icons.notifications_outlined, 'Notifications', '/reminders'),
+    _SidebarDestination(
+      Icons.notifications_outlined,
+      'Notifications',
+      '/reminders',
+    ),
     _SidebarDestination(Icons.settings_outlined, 'Settings', '/settings'),
   ];
 
@@ -189,8 +237,9 @@ class AppSidebarPanel extends StatelessWidget {
     final navigator = appNavigatorKey.currentState;
     if (navigator == null) return;
     if (route == '/dashboard') {
-      navigator.popUntil((existingRoute) =>
-          existingRoute.settings.name == '/dashboard');
+      navigator.popUntil(
+        (existingRoute) => existingRoute.settings.name == '/dashboard',
+      );
       return;
     }
     navigator.pushNamedAndRemoveUntil(
@@ -232,13 +281,15 @@ class AppSidebarPanel extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.directions_car_rounded,
-                      color: Colors.white,
-                      size: 24,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'lib/widgets/maha_tyre_logo.png',
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -300,16 +351,22 @@ class AppSidebarPanel extends StatelessWidget {
                               destination.icon,
                               color: enabled
                                   ? const Color(0xFFA7F3D0)
-                                  : const Color(0xFFA7F3D0).withValues(alpha: 0.45),
+                                  : const Color(
+                                      0xFFA7F3D0,
+                                    ).withValues(alpha: 0.45),
                               size: 20,
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              LanguageService.tr(destination.label.toLowerCase()),
+                              LanguageService.tr(
+                                destination.label.toLowerCase(),
+                              ),
                               style: TextStyle(
                                 color: enabled
                                     ? const Color(0xFFA7F3D0)
-                                    : const Color(0xFFA7F3D0).withValues(alpha: 0.45),
+                                    : const Color(
+                                        0xFFA7F3D0,
+                                      ).withValues(alpha: 0.45),
                                 fontWeight: selected
                                     ? FontWeight.bold
                                     : FontWeight.w500,
@@ -333,8 +390,11 @@ class AppSidebarPanel extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                   child: Row(
                     children: [
-                      const Icon(Icons.logout_rounded,
-                          color: Color(0xFFA7F3D0), size: 20),
+                      const Icon(
+                        Icons.logout_rounded,
+                        color: Color(0xFFA7F3D0),
+                        size: 20,
+                      ),
                       const SizedBox(width: 12),
                       Text(
                         LanguageService.tr('logout'),

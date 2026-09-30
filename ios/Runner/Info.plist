@@ -24,6 +24,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Capture supplier bill photos to attach them to saved purchase bills.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose supplier bill photos to attach them to saved purchase bills.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

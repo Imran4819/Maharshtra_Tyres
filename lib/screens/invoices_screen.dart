@@ -84,7 +84,6 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
       builder: (context, currentLang, child) {
         return Scaffold(
           backgroundColor: AppColors.getScaffoldBg(context),
-          drawer: const AppSidebarDrawer(),
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: AppColors.primary,
             onPressed: () async {

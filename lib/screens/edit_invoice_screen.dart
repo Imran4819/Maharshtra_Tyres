@@ -148,7 +148,6 @@ class _EditInvoiceScreenState extends State<EditInvoiceScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           // Header Banner

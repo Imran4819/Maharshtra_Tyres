@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:maharashtra_tyres/services/auth_service.dart';
 import 'package:maharashtra_tyres/services/customer_service.dart';
@@ -15,6 +17,15 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const int _heroSlideCount = 3;
+  static const int _heroInitialPage = 600;
+
+  final PageController _heroPageController = PageController(
+    initialPage: _heroInitialPage,
+    viewportFraction: 0.91,
+  );
+  Timer? _heroAutoScrollTimer;
+  int _heroPageIndex = _heroInitialPage;
   bool _isLoadingData = false;
   String _userName = 'Admin';
   String _userInitials = 'AD';
@@ -22,10 +33,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Map<String, dynamic>> _customers = [];
   List<Map<String, dynamic>> _inventory = [];
 
+  int get _activeHeroPage => _heroPageIndex % _heroSlideCount;
+
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
+    _scheduleHeroAutoScroll();
+  }
+
+  @override
+  void dispose() {
+    _heroAutoScrollTimer?.cancel();
+    _heroPageController.dispose();
+    super.dispose();
+  }
+
+  void _scheduleHeroAutoScroll() {
+    _heroAutoScrollTimer?.cancel();
+    _heroAutoScrollTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) return;
+      if (!_heroPageController.hasClients) {
+        _scheduleHeroAutoScroll();
+        return;
+      }
+      _heroPageController.nextPage(
+        duration: const Duration(milliseconds: 550),
+        curve: Curves.easeInOutCubic,
+      );
+    });
+  }
+
+  void _goToHeroSlide(int slideIndex) {
+    if (slideIndex == _activeHeroPage) return;
+    final cycleStart = _heroPageIndex - _activeHeroPage;
+    var targetPage = cycleStart + slideIndex;
+    if (slideIndex < _activeHeroPage) targetPage += _heroSlideCount;
+    _heroPageController.animateToPage(
+      targetPage,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _loadDashboardData() async {
@@ -82,6 +130,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return (item['status']?.toString().toLowerCase() ?? 'active') == 'active';
   }).length;
 
+  int get _availableStockUnits => _inventory.fold<int>(0, (sum, item) {
+    final status = item['status']?.toString().toLowerCase() ?? 'active';
+    if (status != 'active') return sum;
+    final quantity = _number(item['quantity']).round();
+    return sum + (quantity > 0 ? quantity : 0);
+  });
+
   int get _lowStockCount => _inventory.where((item) {
     final status = item['status']?.toString().toLowerCase() ?? 'active';
     final quantity = _number(item['quantity']);
@@ -122,6 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildDesktopLayout({required bool showLocalSidebar}) {
     return Scaffold(
       backgroundColor: AppColors.getScaffoldBg(context),
+      floatingActionButton: _buildCreateInvoiceButton(),
       body: Row(
         children: [
           if (showLocalSidebar)
@@ -145,6 +201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMobileLayout() {
     return Scaffold(
       backgroundColor: AppColors.getScaffoldBg(context),
+      floatingActionButton: _buildCreateInvoiceButton(),
       drawer: const AppSidebarDrawer(),
       appBar: AppBar(
         titleSpacing: 0,
@@ -152,6 +209,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [_buildHeaderActions(compact: true)],
       ),
       body: _buildRefreshableContent(isMobile: true),
+    );
+  }
+
+  Widget _buildCreateInvoiceButton() {
+    return FloatingActionButton.extended(
+      onPressed: () => Navigator.pushNamed(context, '/add-invoice'),
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      elevation: 8,
+      shape: const StadiumBorder(),
+      icon: const Icon(Icons.add_rounded),
+      label: const Text(
+        'Create invoice',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
     );
   }
 
@@ -302,9 +374,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onRefresh: _loadDashboardData,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 16 : 30,
-              vertical: isMobile ? 18 : 28,
+            padding: EdgeInsets.fromLTRB(
+              isMobile ? 16 : 30,
+              isMobile ? 18 : 28,
+              isMobile ? 16 : 30,
+              108,
             ),
             child: Center(
               child: ConstrainedBox(
@@ -338,45 +412,147 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final compact = availableWidth < 520;
     final today = DateTime.now();
     final dateLabel = '${_monthName(today.month)} ${today.day}, ${today.year}';
-    return Container(
-      padding: EdgeInsets.all(compact ? 22 : 28),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF073822), Color(0xFF0F5132), Color(0xFF087F5B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.18),
-            blurRadius: 26,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -30,
-            top: -45,
-            child: Icon(
-              Icons.donut_large_rounded,
-              size: 190,
-              color: Colors.white.withValues(alpha: 0.055),
+    return Column(
+      children: [
+        SizedBox(
+          height: compact ? 244 : 216,
+          child: Listener(
+            onPointerDown: (_) => _heroAutoScrollTimer?.cancel(),
+            onPointerUp: (_) => _scheduleHeroAutoScroll(),
+            onPointerCancel: (_) => _scheduleHeroAutoScroll(),
+            child: PageView.builder(
+              controller: _heroPageController,
+              padEnds: false,
+              onPageChanged: (index) {
+                if (_heroPageIndex != index) {
+                  setState(() => _heroPageIndex = index);
+                }
+                _scheduleHeroAutoScroll();
+              },
+              itemBuilder: (context, index) {
+                final slideIndex = index % _heroSlideCount;
+                final Widget slide;
+                if (slideIndex == 0) {
+                  slide = _buildWelcomeSlide(compact, dateLabel);
+                } else if (slideIndex == 1) {
+                  slide = _buildMonthlySalesSlide(compact);
+                } else {
+                  slide = _buildStockOrdersSlide(compact);
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: slide,
+                );
+              },
             ),
           ),
-          if (compact)
-            Column(
+        ),
+        const SizedBox(height: 9),
+        Row(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.swipe_rounded,
+                    size: 15,
+                    color: AppColors.getTextMuted(context),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _activeHeroPage == 0
+                          ? 'Swipe for monthly snapshot'
+                          : _activeHeroPage == 1
+                          ? 'Swipe for stock and orders'
+                          : 'Swipe for welcome',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.getTextMuted(context),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(_heroSlideCount, (index) {
+                final active = _activeHeroPage == index;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: GestureDetector(
+                    onTap: () => _goToHeroSlide(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      width: active ? 17 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? AppColors.primary
+                            : AppColors.getBorder(context),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${(_activeHeroPage + 1).toString().padLeft(2, '0')} / ${_heroSlideCount.toString().padLeft(2, '0')}',
+              style: TextStyle(
+                color: AppColors.getTextSecondary(context),
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Material(
+              color: AppColors.getSurfaceCard(context),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => _heroPageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                ),
+                child: SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWelcomeSlide(bool compact, String dateLabel) {
+    return _premiumHeroCard(
+      colors: const [Color(0xFF073822), Color(0xFF0F5132), Color(0xFF087F5B)],
+      ornament: Icons.donut_large_rounded,
+      padding: EdgeInsets.all(compact ? 17 : 28),
+      child: compact
+          ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _welcomeMessage(compact: true, dateLabel: dateLabel),
-                const SizedBox(height: 20),
-                _todaySalesPanel(),
+                const SizedBox(height: 10),
+                _todaySalesPanel(compact: true),
               ],
             )
-          else
-            Row(
+          : Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
@@ -387,7 +563,327 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(flex: 4, child: _todaySalesPanel()),
               ],
             ),
+    );
+  }
+
+  Widget _buildMonthlySalesSlide(bool compact) {
+    final monthLabel = _monthName(DateTime.now().month);
+    final chartValues = _lastSixMonthsSales;
+    final maxValue = chartValues.fold<double>(
+      0,
+      (max, month) => month.value > max ? month.value : max,
+    );
+    return _premiumHeroCard(
+      colors: const [Color(0xFF102F46), Color(0xFF07594A), Color(0xFF087F5B)],
+      ornament: Icons.show_chart_rounded,
+      padding: EdgeInsets.all(compact ? 22 : 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_graph_rounded,
+                size: 15,
+                color: AppColors.primarySoft,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                'MONTHLY SNAPSHOT',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.76),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                monthLabel.substring(0, 3).toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.7,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Revenue this month',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _currency(_monthSales),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: compact ? 30 : 34,
+              height: 1.08,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.6,
+            ),
+          ),
+          const Spacer(),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.13),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.receipt_long_rounded,
+                      color: Colors.white,
+                      size: 15,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      '${_monthInvoices.length} invoices',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: compact ? 72 : 124,
+                height: 34,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    for (final month in chartValues)
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            height: maxValue == 0
+                                ? 5
+                                : (month.value / maxValue * 30)
+                                      .clamp(5, 30)
+                                      .toDouble(),
+                            decoration: BoxDecoration(
+                              color: month.isCurrent
+                                  ? AppColors.primarySoft
+                                  : Colors.white.withValues(alpha: 0.28),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStockOrdersSlide(bool compact) {
+    return _premiumHeroCard(
+      colors: const [Color(0xFF123A3D), Color(0xFF0F5C50), Color(0xFF087F5B)],
+      ornament: Icons.inventory_2_rounded,
+      padding: EdgeInsets.all(compact ? 17 : 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.bolt_rounded,
+                size: 15,
+                color: AppColors.primarySoft,
+              ),
+              const SizedBox(width: 7),
+              Text(
+                'DAILY BUSINESS PULSE',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.76),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.9,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'TODAY',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Stock & orders',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: compact ? 21 : 24,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _heroMetricTile(
+                    icon: Icons.receipt_long_rounded,
+                    label: 'TODAY\'S ORDERS',
+                    value: _todayInvoices.length.toString(),
+                    detail: 'orders created today',
+                    compact: compact,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _heroMetricTile(
+                    icon: Icons.inventory_2_outlined,
+                    label: 'STOCK AVAILABLE',
+                    value: _formatIndianNumber(_availableStockUnits),
+                    detail: 'units on hand',
+                    compact: compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroMetricTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required String detail,
+    required bool compact,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(compact ? 10 : 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: AppColors.primarySoft, size: 17),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: compact ? 23 : 26,
+              height: 1.05,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 8,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            detail,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.68),
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _premiumHeroCard({
+    required List<Color> colors,
+    required IconData ornament,
+    required EdgeInsetsGeometry padding,
+    required Widget child,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.18),
+            blurRadius: 26,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -28,
+                top: -47,
+                child: Icon(
+                  ornament,
+                  size: 190,
+                  color: Colors.white.withValues(alpha: 0.055),
+                ),
+              ),
+              Padding(padding: padding, child: child),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -415,51 +911,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: compact ? 9 : 12),
         Text(
           'Welcome back, $_userName',
           maxLines: compact ? 2 : 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: Colors.white,
-            fontSize: compact ? 25 : 29,
+            fontSize: compact ? 23 : 29,
             height: 1.12,
             letterSpacing: -0.4,
             fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 7),
+        SizedBox(height: compact ? 5 : 7),
         Text(
           'Here is what is happening with your business today.',
+          maxLines: compact ? 1 : null,
+          overflow: compact ? TextOverflow.ellipsis : null,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.78),
             fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 18),
-        FilledButton.icon(
-          onPressed: () => Navigator.pushNamed(context, '/add-invoice'),
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text(
-            'Create invoice',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
           ),
         ),
       ],
     );
   }
 
-  Widget _todaySalesPanel() {
+  Widget _todaySalesPanel({bool compact = false}) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(compact ? 10 : 18),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.11),
         borderRadius: BorderRadius.circular(18),
@@ -468,8 +949,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: compact ? 36 : 42,
+            height: compact ? 36 : 42,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(13),
@@ -480,7 +961,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               size: 22,
             ),
           ),
-          const SizedBox(width: 13),
+          SizedBox(width: compact ? 10 : 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1070,11 +1551,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : 1;
     final actions = <_QuickActionData>[
       _QuickActionData(
-        'New invoice',
-        'Create a customer bill',
-        Icons.add_card_rounded,
+        'View sales',
+        'Review your revenue',
+        Icons.trending_up_rounded,
         AppColors.primary,
-        '/add-invoice',
+        '/sales',
       ),
       _QuickActionData(
         'Add customer',

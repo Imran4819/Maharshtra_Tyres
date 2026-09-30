@@ -104,7 +104,6 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           _buildTopBar(context),

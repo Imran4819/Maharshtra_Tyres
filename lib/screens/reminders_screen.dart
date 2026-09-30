@@ -549,7 +549,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.getScaffoldBg(context),
-      drawer: const AppSidebarDrawer(),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primary,
         onPressed: () => _showAddReminderModal(context),

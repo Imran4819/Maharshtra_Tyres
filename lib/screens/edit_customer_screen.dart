@@ -102,7 +102,6 @@ class _EditCustomerScreenState extends State<EditCustomerScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           // Header Banner

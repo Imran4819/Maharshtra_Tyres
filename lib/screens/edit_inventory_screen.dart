@@ -102,7 +102,6 @@ class _EditInventoryScreenState extends State<EditInventoryScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           // Header Banner

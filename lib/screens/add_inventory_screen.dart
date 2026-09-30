@@ -131,7 +131,6 @@ class _AddInventoryScreenState extends State<AddInventoryScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.bgLight,
-      drawer: const AppSidebarDrawer(),
       body: Column(
         children: [
           _buildTopBar(context),
