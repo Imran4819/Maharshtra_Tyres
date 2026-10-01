@@ -4,8 +4,10 @@ import 'package:maharashtra_tyres/services/auth_service.dart';
 
 class InvoiceService {
   // Coalesce concurrent in-flight requests to avoid duplicate network calls
-  static final Map<String, Future<List<Map<String, dynamic>>>> _inFlightInvoices = {};
-  static final Map<String, Future<List<Map<String, dynamic>>>> _inFlightReminders = {};
+  static final Map<String, Future<List<Map<String, dynamic>>>>
+  _inFlightInvoices = {};
+  static final Map<String, Future<List<Map<String, dynamic>>>>
+  _inFlightReminders = {};
 
   static Future<String> _getBaseUrl() async {
     final clientId = await AuthService.getClientId();
@@ -92,7 +94,9 @@ class InvoiceService {
   }
 
   // Create invoice
-  static Future<Map<String, dynamic>> createInvoice(Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> createInvoice(
+    Map<String, dynamic> payload,
+  ) async {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
@@ -112,7 +116,10 @@ class InvoiceService {
   }
 
   // Update invoice
-  static Future<Map<String, dynamic>> updateInvoice(String id, Map<String, dynamic> payload) async {
+  static Future<Map<String, dynamic>> updateInvoice(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
@@ -147,7 +154,10 @@ class InvoiceService {
   }
 
   // Fetch Invoice PDF bytes
-  static Future<List<int>?> fetchInvoicePdfBytes(String id, {String? lang}) async {
+  static Future<List<int>?> fetchInvoicePdfBytes(
+    String id, {
+    String? lang,
+  }) async {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
@@ -155,10 +165,7 @@ class InvoiceService {
       final pdfUri = Uri.parse('$url/$id/pdf').replace(
         queryParameters: lang == null || lang.isEmpty ? null : {'lang': lang},
       );
-      final response = await http.get(
-        pdfUri,
-        headers: headers,
-      );
+      final response = await http.get(pdfUri, headers: headers);
       if (response.statusCode == 200) {
         final bytes = response.bodyBytes;
         final header = String.fromCharCodes(bytes.take(1024));
@@ -171,7 +178,9 @@ class InvoiceService {
   }
 
   // Fetch Overdue Payment Reminders (>10 Days)
-  static Future<List<Map<String, dynamic>>> fetchOverdueReminders({int days = 10}) async {
+  static Future<List<Map<String, dynamic>>> fetchOverdueReminders({
+    int days = 10,
+  }) async {
     try {
       final clientBaseUrl = await _getClientBaseUrl();
       final url = '$clientBaseUrl/overdue-reminders?days=$days';
@@ -182,10 +191,7 @@ class InvoiceService {
       final fetchFuture = () async {
         try {
           final headers = await _getHeaders();
-          final response = await http.get(
-            Uri.parse(url),
-            headers: headers,
-          );
+          final response = await http.get(Uri.parse(url), headers: headers);
 
           if (response.statusCode == 200 || response.statusCode == 201) {
             final data = jsonDecode(response.body);
@@ -209,7 +215,10 @@ class InvoiceService {
   }
 
   // Send Payment Reminder (via SMS & Email)
-  static Future<Map<String, dynamic>> sendPaymentReminder(String id, {String channel = 'all'}) async {
+  static Future<Map<String, dynamic>> sendPaymentReminder(
+    String id, {
+    String channel = 'all',
+  }) async {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
@@ -227,7 +236,10 @@ class InvoiceService {
           'sent_channels': data['data']?['sent_channels'] ?? [],
         };
       }
-      return {'success': false, 'message': 'Failed to send reminder. Code: ${response.statusCode}'};
+      return {
+        'success': false,
+        'message': 'Failed to send reminder. Code: ${response.statusCode}',
+      };
     } catch (e) {
       return {'success': false, 'message': 'Error sending reminder: $e'};
     }

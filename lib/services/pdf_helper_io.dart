@@ -41,10 +41,7 @@ Future<bool> saveAndOpenPdf(List<int> bytes, String filename) async {
     try {
       final saved = await _androidPdfChannel.invokeMethod<bool>(
         'saveAndOpenPdf',
-        {
-          'bytes': Uint8List.fromList(bytes),
-          'filename': filename,
-        },
+        {'bytes': Uint8List.fromList(bytes), 'filename': filename},
       );
       if (saved == true) return true;
     } on PlatformException catch (e) {
