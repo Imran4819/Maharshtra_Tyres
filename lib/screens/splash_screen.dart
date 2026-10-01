@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/services/reminder_notification_service.dart';
+import 'package:maharashtra_tyres/services/push_notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -66,12 +67,16 @@ class _SplashScreenState extends State<SplashScreen>
     if (isLoggedIn) {
       final initialReminder = ReminderNotificationService.instance
           .takeInitialNotification();
+      final initialPushRoute = PushNotificationService.instance
+          .takeInitialMessageRoute();
       if (initialReminder != null) {
         Navigator.pushReplacementNamed(
           context,
           '/reminders',
           arguments: initialReminder,
         );
+      } else if (initialPushRoute != null) {
+        Navigator.pushReplacementNamed(context, initialPushRoute);
       } else {
         Navigator.pushReplacementNamed(context, '/dashboard');
       }

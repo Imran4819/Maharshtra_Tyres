@@ -151,13 +151,18 @@ class InvoiceService {
     try {
       final url = await _getBaseUrl();
       final headers = await _getHeaders();
-      final queryParam = lang != null ? '?lang=$lang' : '';
+      headers['accept'] = 'application/pdf, application/octet-stream';
+      final pdfUri = Uri.parse('$url/$id/pdf').replace(
+        queryParameters: lang == null || lang.isEmpty ? null : {'lang': lang},
+      );
       final response = await http.get(
-        Uri.parse('$url/$id/pdf$queryParam'),
+        pdfUri,
         headers: headers,
       );
       if (response.statusCode == 200) {
-        return response.bodyBytes;
+        final bytes = response.bodyBytes;
+        final header = String.fromCharCodes(bytes.take(1024));
+        if (header.contains('%PDF-')) return bytes;
       }
       return null;
     } catch (e) {

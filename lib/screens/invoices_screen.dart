@@ -677,27 +677,43 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
 
   Future<void> _downloadPdf(BuildContext context) async {
     setState(() => _isPdfDownloading = true);
+    try {
+      final lang = LanguageService.currentLanguage.value;
+      final bytes = await InvoiceService.fetchInvoicePdfBytes(
+        widget.invoice['id'],
+        lang: lang,
+      );
 
-    final lang = LanguageService.currentLanguage.value;
-    final bytes = await InvoiceService.fetchInvoicePdfBytes(widget.invoice['id'], lang: lang);
+      if (!mounted) return;
+      if (bytes == null || bytes.isEmpty) {
+        showAppSnackBar(
+          context,
+          'The server did not return a valid invoice PDF.',
+          type: SnackBarType.error,
+        );
+        return;
+      }
 
-    if (!mounted) return;
-    setState(() => _isPdfDownloading = false);
-
-    if (bytes != null && bytes.isNotEmpty) {
       final filename = '${widget.invoice['invoice_number'] ?? 'invoice'}.pdf';
-      await saveAndOpenPdf(bytes, filename);
+      final saved = await saveAndOpenPdf(bytes, filename);
+      if (!mounted) return;
       showAppSnackBar(
         context,
-        'PDF $filename generated successfully.',
-        type: SnackBarType.success,
+        saved
+            ? 'PDF saved to Downloads or opened in a PDF app.'
+            : 'Could not save or open the PDF on this device.',
+        type: saved ? SnackBarType.success : SnackBarType.error,
       );
-    } else {
-      showAppSnackBar(
-        context,
-        'Failed to generate PDF. Make sure your server is running.',
-        type: SnackBarType.error,
-      );
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Failed to generate PDF. Please try again.',
+          type: SnackBarType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPdfDownloading = false);
     }
   }
 

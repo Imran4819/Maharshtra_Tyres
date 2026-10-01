@@ -1,7 +1,7 @@
 import 'dart:async';
 
-Future<void> saveAndOpenPdf(List<int> bytes, String filename) async {
-  throw UnimplementedError('Unsupported platform');
+Future<bool> saveAndOpenPdf(List<int> bytes, String filename) async {
+  return false;
 }
 
 Future<void> sharePdf(List<int> bytes, String filename, {String? text}) {

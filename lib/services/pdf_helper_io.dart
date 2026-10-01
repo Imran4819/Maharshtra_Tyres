@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+
+const _androidPdfChannel = MethodChannel('maharashtra_tyres/pdf');
 
 Future<File?> _savePdfToStorage(List<int> bytes, String filename) async {
   try {
     Directory? dir;
-    if (Platform.isAndroid) {
-      dir = Directory('/storage/emulated/0/Download');
-      if (!dir.existsSync()) {
-        dir = await getExternalStorageDirectory();
-      }
-    } else if (Platform.isIOS || Platform.isMacOS) {
+    if (Platform.isIOS || Platform.isMacOS) {
       dir = await getApplicationDocumentsDirectory();
+    } else if (Platform.isAndroid) {
+      dir = await getExternalStorageDirectory();
     } else {
       dir = await getDownloadsDirectory();
     }
@@ -35,7 +36,24 @@ Future<File?> _savePdfToStorage(List<int> bytes, String filename) async {
   }
 }
 
-Future<void> saveAndOpenPdf(List<int> bytes, String filename) async {
+Future<bool> saveAndOpenPdf(List<int> bytes, String filename) async {
+  if (Platform.isAndroid) {
+    try {
+      final saved = await _androidPdfChannel.invokeMethod<bool>(
+        'saveAndOpenPdf',
+        {
+          'bytes': Uint8List.fromList(bytes),
+          'filename': filename,
+        },
+      );
+      if (saved == true) return true;
+    } on PlatformException catch (e) {
+      debugPrint('Android PDF save warning: ${e.message}');
+    } on MissingPluginException {
+      // Use the regular share flow on older app installations.
+    }
+  }
+
   try {
     final file = await _savePdfToStorage(bytes, filename);
     if (file != null) {
@@ -45,10 +63,12 @@ Future<void> saveAndOpenPdf(List<int> bytes, String filename) async {
           text: 'Invoice PDF: $filename',
         ),
       );
+      return true;
     }
   } catch (e) {
     debugPrint('Local PDF save and open warning: $e');
   }
+  return false;
 }
 
 Future<void> sharePdf(List<int> bytes, String filename, {String? text}) async {

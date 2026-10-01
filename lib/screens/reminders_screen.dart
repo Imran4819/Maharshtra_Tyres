@@ -5,6 +5,7 @@ import 'package:maharashtra_tyres/theme/app_theme.dart';
 import 'package:maharashtra_tyres/services/invoice_service.dart';
 import 'package:maharashtra_tyres/services/inventory_service.dart';
 import 'package:maharashtra_tyres/services/reminder_notification_service.dart';
+import 'package:maharashtra_tyres/services/push_notification_service.dart';
 import 'package:maharashtra_tyres/widgets/custom_snackbar.dart';
 import 'package:maharashtra_tyres/widgets/reminder_notification_popup.dart';
 import 'package:maharashtra_tyres/widgets/app_navigation.dart';
@@ -67,8 +68,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final wasEnabled = _notificationsEnabled;
     setState(() => _updatingNotificationSetting = true);
 
-    final enabled = await ReminderNotificationService.instance
-        .setEnabled(!_notificationsEnabled);
+    final enabled = await ReminderNotificationService.instance.setEnabled(
+      !_notificationsEnabled,
+    );
+    final pushRegistered = enabled
+        ? await PushNotificationService.instance.requestPermissionAndRegister()
+        : true;
+    if (!enabled) {
+      await PushNotificationService.instance.disablePushToken();
+    }
 
     if (!mounted) return;
     setState(() {
@@ -79,10 +87,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
     showAppSnackBar(
       context,
       enabled
-          ? 'Reminder notifications are on.'
+          ? pushRegistered
+                ? 'Reminder notifications and server push are on.'
+                : 'Reminder notifications are on, but server push could not be registered.'
           : (wasEnabled
-              ? 'Reminder notifications are off.'
-              : 'Allow notifications in your device or browser settings to receive alerts.'),
+                ? 'Reminder notifications are off.'
+                : 'Allow notifications in your device or browser settings to receive alerts.'),
       type: enabled ? SnackBarType.success : SnackBarType.info,
     );
   }
@@ -206,14 +216,22 @@ class _RemindersScreenState extends State<RemindersScreen> {
       final fetchedApi = await InvoiceService.fetchOverdueReminders(days: 10);
       final apiReminders = fetchedApi.map((item) {
         final rawDate = item['due_date']?.toString() ?? '';
-        final datePart = rawDate.contains('T') ? rawDate.split('T')[0] : rawDate;
+        final datePart = rawDate.contains('T')
+            ? rawDate.split('T')[0]
+            : rawDate;
         return {
-          'id': item['id']?.toString() ?? 'inv_rem_${DateTime.now().millisecondsSinceEpoch}',
+          'id':
+              item['id']?.toString() ??
+              'inv_rem_${DateTime.now().millisecondsSinceEpoch}',
           'invoice_id': item['id'],
-          'title': item['title'] ?? 'Collect payment for ${item['invoice_number']} from ${item['customer_name']}',
+          'title':
+              item['title'] ??
+              'Collect payment for ${item['invoice_number']} from ${item['customer_name']}',
           'category': 'Payment Due',
           'priority': item['priority'] != null
-              ? (item['priority'].toString().contains('High') ? 'High' : 'Medium')
+              ? (item['priority'].toString().contains('High')
+                    ? 'High'
+                    : 'Medium')
               : 'High',
           'due_date': datePart.isNotEmpty ? datePart : 'Overdue',
           'time': '05:00 PM',
@@ -231,10 +249,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
     try {
       final inventoryItems = await InventoryService.fetchInventory();
-      final todayStr = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+      final todayStr =
+          "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
 
       for (final item in inventoryItems) {
-        final qty = int.tryParse(item['quantity']?.toString() ?? item['stock']?.toString() ?? '10') ?? 10;
+        final qty =
+            int.tryParse(
+              item['quantity']?.toString() ?? item['stock']?.toString() ?? '10',
+            ) ??
+            10;
         if (qty <= 5) {
           final prodName = item['product_name'] ?? item['name'] ?? 'Tyre Item';
           dynamicReminders.add({
@@ -255,7 +278,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
 
     final existingIds = userReminders.map((r) => r['id']).toSet();
-    final uniqueDynamicReminders = dynamicReminders.where((r) => !existingIds.contains(r['id'])).toList();
+    final uniqueDynamicReminders = dynamicReminders
+        .where((r) => !existingIds.contains(r['id']))
+        .toList();
 
     _reminders = [...uniqueDynamicReminders, ...userReminders];
     await _saveReminders();
@@ -284,8 +309,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
       final title = rem['title']?.toString().toLowerCase() ?? '';
       final notes = rem['notes']?.toString().toLowerCase() ?? '';
 
-      final matchCategory = _selectedCategory == 'All' || category == _selectedCategory;
-      final matchSearch = _searchQuery.isEmpty ||
+      final matchCategory =
+          _selectedCategory == 'All' || category == _selectedCategory;
+      final matchSearch =
+          _searchQuery.isEmpty ||
           title.contains(_searchQuery.toLowerCase()) ||
           notes.contains(_searchQuery.toLowerCase());
 
@@ -294,12 +321,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
   }
 
   int get _dueTodayCount {
-    final todayStr = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
-    return _reminders.where((r) => r['due_date'] == todayStr && r['completed'] != true).length;
+    final todayStr =
+        "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+    return _reminders
+        .where((r) => r['due_date'] == todayStr && r['completed'] != true)
+        .length;
   }
 
-  int get _pendingTotalCount => _reminders.where((r) => r['completed'] != true).length;
-  int get _completedTotalCount => _reminders.where((r) => r['completed'] == true).length;
+  int get _pendingTotalCount =>
+      _reminders.where((r) => r['completed'] != true).length;
+  int get _completedTotalCount =>
+      _reminders.where((r) => r['completed'] == true).length;
 
   Future<void> _toggleComplete(String id) async {
     setState(() {
@@ -354,7 +386,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
               ),
               decoration: BoxDecoration(
                 color: AppColors.getSurfaceCard(context),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -384,7 +418,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close_rounded, color: AppColors.getTextSecondary(context)),
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: AppColors.getTextSecondary(context),
+                          ),
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
@@ -392,11 +429,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: titleCtrl,
-                      style: TextStyle(color: AppColors.getTextPrimary(context)),
+                      style: TextStyle(
+                        color: AppColors.getTextPrimary(context),
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Reminder Title *',
                         hintText: 'e.g. Call customer for payment due',
-                        hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7)),
+                        hintStyle: TextStyle(
+                          color: AppColors.getTextSecondary(
+                            context,
+                          ).withValues(alpha: 0.7),
+                        ),
                         prefixIcon: const Icon(Icons.title_rounded),
                       ),
                     ),
@@ -407,14 +450,21 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           child: DropdownButtonFormField<String>(
                             value: category,
                             dropdownColor: AppColors.getSurfaceCard(context),
-                            style: TextStyle(color: AppColors.getTextPrimary(context)),
+                            style: TextStyle(
+                              color: AppColors.getTextPrimary(context),
+                            ),
                             decoration: const InputDecoration(
                               labelText: 'Category',
                               prefixIcon: Icon(Icons.category_outlined),
                             ),
                             items: _categories
                                 .where((c) => c != 'All')
-                                .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (v) {
                               if (v != null) setModalState(() => category = v);
@@ -426,13 +476,20 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           child: DropdownButtonFormField<String>(
                             value: priority,
                             dropdownColor: AppColors.getSurfaceCard(context),
-                            style: TextStyle(color: AppColors.getTextPrimary(context)),
+                            style: TextStyle(
+                              color: AppColors.getTextPrimary(context),
+                            ),
                             decoration: const InputDecoration(
                               labelText: 'Priority',
                               prefixIcon: Icon(Icons.flag_outlined),
                             ),
                             items: ['High', 'Medium', 'Normal']
-                                .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                                .map(
+                                  (p) => DropdownMenuItem(
+                                    value: p,
+                                    child: Text(p),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (v) {
                               if (v != null) setModalState(() => priority = v);
@@ -450,7 +507,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                               final picked = await showDatePicker(
                                 context: context,
                                 initialDate: selectedDate,
-                                firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                                firstDate: DateTime.now().subtract(
+                                  const Duration(days: 1),
+                                ),
                                 lastDate: DateTime(2030),
                               );
                               if (picked != null) {
@@ -462,7 +521,13 @@ class _RemindersScreenState extends State<RemindersScreen> {
                                 labelText: 'Due Date',
                                 prefixIcon: Icon(Icons.calendar_today_outlined),
                               ),
-                              child: Text(dateStr, style: TextStyle(fontSize: 13, color: AppColors.getTextPrimary(context))),
+                              child: Text(
+                                dateStr,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.getTextPrimary(context),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -483,8 +548,13 @@ class _RemindersScreenState extends State<RemindersScreen> {
                                 labelText: 'Due Time',
                                 prefixIcon: Icon(Icons.access_time_rounded),
                               ),
-                              child: Text(selectedTime.format(context),
-                                  style: TextStyle(fontSize: 13, color: AppColors.getTextPrimary(context))),
+                              child: Text(
+                                selectedTime.format(context),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.getTextPrimary(context),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -494,11 +564,18 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     TextField(
                       controller: notesCtrl,
                       maxLines: 2,
-                      style: TextStyle(color: AppColors.getTextPrimary(context)),
+                      style: TextStyle(
+                        color: AppColors.getTextPrimary(context),
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Notes / Contact Info',
-                        hintText: 'e.g. Contact phone number or specific instructions',
-                        hintStyle: TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7)),
+                        hintText:
+                            'e.g. Contact phone number or specific instructions',
+                        hintStyle: TextStyle(
+                          color: AppColors.getTextSecondary(
+                            context,
+                          ).withValues(alpha: 0.7),
+                        ),
                         prefixIcon: const Icon(Icons.notes_rounded),
                       ),
                     ),
@@ -510,7 +587,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         onPressed: () async {
                           if (titleCtrl.text.trim().isEmpty) return;
                           final newRem = {
-                            'id': 'rem_${DateTime.now().millisecondsSinceEpoch}',
+                            'id':
+                                'rem_${DateTime.now().millisecondsSinceEpoch}',
                             'title': titleCtrl.text.trim(),
                             'category': category,
                             'priority': priority,
@@ -525,13 +603,17 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           await _saveReminders();
                           if (ctx.mounted) Navigator.pop(ctx);
                         },
-                        icon: const Icon(Icons.add_task_rounded, color: Colors.white),
+                        icon: const Icon(
+                          Icons.add_task_rounded,
+                          color: Colors.white,
+                        ),
                         label: const Text(
                           'Save Reminder',
                           style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15),
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                     ),
@@ -638,24 +720,50 @@ class _RemindersScreenState extends State<RemindersScreen> {
   // ─── METRICS GRID ──────────────────────────────────────────────────────────
   Widget _buildMetricsGrid() {
     final stats = [
-      _RemStat('Due Today', '$_dueTodayCount', Icons.today_rounded, const Color(0xFFEF4444), const Color(0xFFEF4444).withValues(alpha: 0.15)),
-      _RemStat('Total Pending', '$_pendingTotalCount', Icons.pending_actions_rounded, const Color(0xFFF59E0B), const Color(0xFFF59E0B).withValues(alpha: 0.15)),
-      _RemStat('Completed', '$_completedTotalCount', Icons.task_alt_rounded, const Color(0xFF10B981), const Color(0xFF10B981).withValues(alpha: 0.15)),
-      _RemStat('All Tasks', '${_reminders.length}', Icons.format_list_bulleted_rounded, AppColors.primary, AppColors.primaryLight),
+      _RemStat(
+        'Due Today',
+        '$_dueTodayCount',
+        Icons.today_rounded,
+        const Color(0xFFEF4444),
+        const Color(0xFFEF4444).withValues(alpha: 0.15),
+      ),
+      _RemStat(
+        'Total Pending',
+        '$_pendingTotalCount',
+        Icons.pending_actions_rounded,
+        const Color(0xFFF59E0B),
+        const Color(0xFFF59E0B).withValues(alpha: 0.15),
+      ),
+      _RemStat(
+        'Completed',
+        '$_completedTotalCount',
+        Icons.task_alt_rounded,
+        const Color(0xFF10B981),
+        const Color(0xFF10B981).withValues(alpha: 0.15),
+      ),
+      _RemStat(
+        'All Tasks',
+        '${_reminders.length}',
+        Icons.format_list_bulleted_rounded,
+        AppColors.primary,
+        AppColors.primaryLight,
+      ),
     ];
 
-    return LayoutBuilder(builder: (context, constraints) {
-      final cols = constraints.maxWidth > 560 ? 4 : 2;
-      return GridView.count(
-        crossAxisCount: cols,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: cols == 4 ? 1.6 : 1.45,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: stats.map((s) => _buildStatCard(s)).toList(),
-      );
-    });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = constraints.maxWidth > 560 ? 4 : 2;
+        return GridView.count(
+          crossAxisCount: cols,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: cols == 4 ? 1.6 : 1.45,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: stats.map((s) => _buildStatCard(s)).toList(),
+        );
+      },
+    );
   }
 
   Widget _buildStatCard(_RemStat s) {
@@ -733,17 +841,30 @@ class _RemindersScreenState extends State<RemindersScreen> {
           child: TextField(
             controller: _searchController,
             onChanged: (v) => setState(() => _searchQuery = v),
-            style: TextStyle(color: AppColors.getTextPrimary(context), fontSize: 14),
+            style: TextStyle(
+              color: AppColors.getTextPrimary(context),
+              fontSize: 14,
+            ),
             decoration: InputDecoration(
               hintText: 'Search reminders by title or notes...',
-              hintStyle:
-                  TextStyle(color: AppColors.getTextSecondary(context).withValues(alpha: 0.7), fontSize: 13),
-              prefixIcon: Icon(Icons.search_rounded,
-                  color: AppColors.getTextSecondary(context), size: 20),
+              hintStyle: TextStyle(
+                color: AppColors.getTextSecondary(
+                  context,
+                ).withValues(alpha: 0.7),
+                fontSize: 13,
+              ),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                color: AppColors.getTextSecondary(context),
+                size: 20,
+              ),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.close_rounded,
-                          color: AppColors.getTextSecondary(context), size: 18),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: AppColors.getTextSecondary(context),
+                        size: 18,
+                      ),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
@@ -754,8 +875,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
             ),
           ),
         ),
@@ -774,7 +897,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     style: TextStyle(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w600,
-                      color: isSel ? Colors.white : AppColors.getTextSecondary(context),
+                      color: isSel
+                          ? Colors.white
+                          : AppColors.getTextSecondary(context),
                     ),
                   ),
                   selected: isSel,
@@ -783,7 +908,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
                     side: BorderSide(
-                      color: isSel ? Colors.transparent : AppColors.getBorder(context),
+                      color: isSel
+                          ? Colors.transparent
+                          : AppColors.getBorder(context),
                     ),
                   ),
                   onSelected: (_) => setState(() => _selectedCategory = cat),
@@ -813,8 +940,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   color: AppColors.primaryLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.alarm_on_rounded,
-                    size: 32, color: AppColors.primary),
+                child: const Icon(
+                  Icons.alarm_on_rounded,
+                  size: 32,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(height: 12),
               Text(
@@ -828,7 +958,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
               const SizedBox(height: 4),
               Text(
                 'Add a new reminder to stay organized.',
-                style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context)),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.getTextSecondary(context),
+                ),
               ),
             ],
           ),
@@ -861,7 +994,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
-  Future<void> _sendReminder(String remId, String? invoiceId, String? phone, String title) async {
+  Future<void> _sendReminder(
+    String remId,
+    String? invoiceId,
+    String? phone,
+    String title,
+  ) async {
     final targetId = invoiceId ?? remId;
     if (_sendingReminderIds.contains(targetId)) return;
 
@@ -887,7 +1025,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
         final rawPhone = (phone ?? '').replaceAll(RegExp(r'[^0-9+]'), '');
         bool launched = false;
         if (rawPhone.isNotEmpty) {
-          final bodyText = Uri.encodeComponent('Payment Reminder: $title. Kindly settle the bill at Maharashtra Tyres.');
+          final bodyText = Uri.encodeComponent(
+            'Payment Reminder: $title. Kindly settle the bill at Maharashtra Tyres.',
+          );
           final smsUri = Uri.parse('sms:$rawPhone?body=$bodyText');
           if (await canLaunchUrl(smsUri)) {
             await launchUrl(smsUri);
@@ -930,7 +1070,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: AppColors.getSurfaceCard(context),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -950,7 +1092,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: category == 'Payment Due'
                               ? const Color(0xFFEF4444).withValues(alpha: 0.15)
@@ -970,9 +1115,14 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                          color: const Color(
+                            0xFFF59E0B,
+                          ).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -986,7 +1136,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       ),
                       const Spacer(),
                       IconButton(
-                        icon: Icon(Icons.close_rounded, color: AppColors.getTextSecondary(context)),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: AppColors.getTextSecondary(context),
+                        ),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
@@ -1000,11 +1153,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       color: AppColors.getTextPrimary(context),
                     ),
                   ),
-                  if (rem['notes'] != null && rem['notes'].toString().isNotEmpty) ...[
+                  if (rem['notes'] != null &&
+                      rem['notes'].toString().isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       rem['notes'].toString(),
-                      style: TextStyle(fontSize: 13, color: AppColors.getTextSecondary(context)),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.getTextSecondary(context),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -1019,21 +1176,54 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.calendar_month_outlined, size: 16, color: AppColors.getTextSecondary(context)),
+                            Icon(
+                              Icons.calendar_month_outlined,
+                              size: 16,
+                              color: AppColors.getTextSecondary(context),
+                            ),
                             const SizedBox(width: 8),
-                            Text('Due Date: ', style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context))),
-                            Text('${rem['due_date']} ${rem['time'] ?? ''}',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context))),
+                            Text(
+                              'Due Date: ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.getTextSecondary(context),
+                              ),
+                            ),
+                            Text(
+                              '${rem['due_date']} ${rem['time'] ?? ''}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.getTextPrimary(context),
+                              ),
+                            ),
                           ],
                         ),
                         if (phone != null && phone.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Icon(Icons.phone_outlined, size: 16, color: AppColors.getTextSecondary(context)),
+                              Icon(
+                                Icons.phone_outlined,
+                                size: 16,
+                                color: AppColors.getTextSecondary(context),
+                              ),
                               const SizedBox(width: 8),
-                              Text('Phone: ', style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context))),
-                              Text(phone, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context))),
+                              Text(
+                                'Phone: ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.getTextSecondary(context),
+                                ),
+                              ),
+                              Text(
+                                phone,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.getTextPrimary(context),
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -1041,10 +1231,27 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Icon(Icons.email_outlined, size: 16, color: AppColors.getTextSecondary(context)),
+                              Icon(
+                                Icons.email_outlined,
+                                size: 16,
+                                color: AppColors.getTextSecondary(context),
+                              ),
                               const SizedBox(width: 8),
-                              Text('Email: ', style: TextStyle(fontSize: 12, color: AppColors.getTextSecondary(context))),
-                              Text(email, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.getTextPrimary(context))),
+                              Text(
+                                'Email: ',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.getTextSecondary(context),
+                                ),
+                              ),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.getTextPrimary(context),
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -1054,32 +1261,46 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      if (category == 'Payment Due' || (phone != null && phone.isNotEmpty)) ...[
+                      if (category == 'Payment Due' ||
+                          (phone != null && phone.isNotEmpty)) ...[
                         Expanded(
                           child: ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: isSending
                                 ? null
                                 : () async {
                                     setSheetState(() {});
-                                    await _sendReminder(remId, invoiceId, phone, rem['title'] ?? '');
+                                    await _sendReminder(
+                                      remId,
+                                      invoiceId,
+                                      phone,
+                                      rem['title'] ?? '',
+                                    );
                                     if (ctx.mounted) setSheetState(() {});
                                   },
                             icon: isSending
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
                                   )
                                 : const Icon(Icons.send_rounded, size: 18),
                             label: Text(
                               isSending ? 'Sending...' : 'Send Reminder',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ),
@@ -1087,30 +1308,45 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       ],
                       IconButton(
                         style: IconButton.styleFrom(
-                          backgroundColor: isDone ? const Color(0xFFF59E0B).withValues(alpha: 0.15) : const Color(0xFF10B981).withValues(alpha: 0.15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          backgroundColor: isDone
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                              : const Color(0xFF10B981).withValues(alpha: 0.15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: () {
                           _toggleComplete(remId);
                           Navigator.pop(ctx);
                         },
                         icon: Icon(
-                          isDone ? Icons.undo_rounded : Icons.check_circle_outline_rounded,
-                          color: isDone ? const Color(0xFFD97706) : const Color(0xFF059669),
+                          isDone
+                              ? Icons.undo_rounded
+                              : Icons.check_circle_outline_rounded,
+                          color: isDone
+                              ? const Color(0xFFD97706)
+                              : const Color(0xFF059669),
                         ),
                         tooltip: isDone ? 'Mark Pending' : 'Mark Completed',
                       ),
                       const SizedBox(width: 8),
                       IconButton(
                         style: IconButton.styleFrom(
-                          backgroundColor: AppColors.error.withValues(alpha: 0.15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          backgroundColor: AppColors.error.withValues(
+                            alpha: 0.15,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: () {
                           _deleteReminder(remId);
                           Navigator.pop(ctx);
                         },
-                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: AppColors.error,
+                        ),
                         tooltip: 'Delete Reminder',
                       ),
                     ],
@@ -1132,31 +1368,35 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final Color priorityColor = priority == 'High'
         ? const Color(0xFFDC2626)
         : priority == 'Medium'
-            ? const Color(0xFFD97706)
-            : AppColors.primary;
+        ? const Color(0xFFD97706)
+        : AppColors.primary;
 
     final Color categoryBg = category == 'Payment Due'
         ? const Color(0xFFEF4444).withValues(alpha: 0.15)
         : category == 'Stock Reorder'
-            ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
-            : category == 'Customer Service'
-                ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                : AppColors.primaryLight;
+        ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+        : category == 'Customer Service'
+        ? const Color(0xFF10B981).withValues(alpha: 0.15)
+        : AppColors.primaryLight;
 
     final Color categoryColor = category == 'Payment Due'
         ? const Color(0xFFDC2626)
         : category == 'Stock Reorder'
-            ? const Color(0xFFD97706)
-            : category == 'Customer Service'
-                ? const Color(0xFF059669)
-                : AppColors.primary;
+        ? const Color(0xFFD97706)
+        : category == 'Customer Service'
+        ? const Color(0xFF059669)
+        : AppColors.primary;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDone ? AppColors.getScaffoldBg(context) : AppColors.getSurfaceCard(context),
+        color: isDone
+            ? AppColors.getScaffoldBg(context)
+            : AppColors.getSurfaceCard(context),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDone ? AppColors.getBorder(context).withValues(alpha: 0.6) : AppColors.getBorder(context),
+          color: isDone
+              ? AppColors.getBorder(context).withValues(alpha: 0.6)
+              : AppColors.getBorder(context),
         ),
         boxShadow: isDone
             ? []
@@ -1192,7 +1432,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
                               color: categoryBg,
                               borderRadius: BorderRadius.circular(6),
@@ -1208,7 +1451,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: priorityColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
@@ -1230,11 +1476,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: isDone ? AppColors.getTextSecondary(context) : AppColors.getTextPrimary(context),
-                          decoration: isDone ? TextDecoration.lineThrough : null,
+                          color: isDone
+                              ? AppColors.getTextSecondary(context)
+                              : AppColors.getTextPrimary(context),
+                          decoration: isDone
+                              ? TextDecoration.lineThrough
+                              : null,
                         ),
                       ),
-                      if (rem['notes'] != null && rem['notes'].toString().isNotEmpty) ...[
+                      if (rem['notes'] != null &&
+                          rem['notes'].toString().isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           rem['notes'],
@@ -1247,8 +1498,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          Icon(Icons.calendar_today_outlined,
-                              size: 12, color: AppColors.getTextSecondary(context)),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 12,
+                            color: AppColors.getTextSecondary(context),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Due: ${rem['due_date']} ${rem['time'] ?? ''}',
@@ -1263,7 +1517,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right_rounded, color: AppColors.getTextSecondary(context), size: 20),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.getTextSecondary(context),
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -1272,7 +1530,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
   }
 }
-
 
 class _RemStat {
   const _RemStat(this.title, this.value, this.icon, this.color, this.bgColor);

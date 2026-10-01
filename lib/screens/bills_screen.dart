@@ -420,21 +420,41 @@ class _BillsScreenState extends State<BillsScreen> {
                           PopupMenuButton<String>(
                             tooltip: 'Bill options',
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 36,
-                              height: 36,
-                            ),
                             icon: Icon(
                               Icons.more_horiz_rounded,
                               color: AppColors.getTextMuted(context),
                             ),
                             onSelected: (value) {
                               if (value == 'edit') _openEditBill(bill);
+                              if (value == 'delete') _deleteBill(bill);
                             },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
                                 value: 'edit',
-                                child: Text('Edit bill'),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit_outlined, size: 18),
+                                    SizedBox(width: 10),
+                                    Text('Edit'),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.delete_outline_rounded,
+                                      size: 18,
+                                      color: AppColors.error,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Delete',
+                                      style: TextStyle(color: AppColors.error),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -715,6 +735,64 @@ class _BillsScreenState extends State<BillsScreen> {
       ),
     );
     if (saved == true) await _loadBills();
+  }
+
+  Future<void> _deleteBill(Map<String, dynamic> bill) async {
+    final id = bill['id']?.toString() ?? '';
+    if (id.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This bill cannot be deleted.')),
+      );
+      return;
+    }
+
+    final storeName = bill['store_name']?.toString().trim() ?? '';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.getSurfaceCard(context),
+        title: Text(
+          'Delete bill?',
+          style: TextStyle(color: AppColors.getTextPrimary(context)),
+        ),
+        content: Text(
+          storeName.isEmpty
+              ? 'This bill will be permanently deleted.'
+              : 'Delete the bill from $storeName? This cannot be undone.',
+          style: TextStyle(color: AppColors.getTextSecondary(context)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await BillService.deleteBill(id);
+      if (!mounted) return;
+      setState(() {
+        _bills.removeWhere((savedBill) => savedBill['id']?.toString() == id);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bill deleted successfully.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
+    }
   }
 
   Future<void> _showBillPreview(Map<String, dynamic> bill) async {

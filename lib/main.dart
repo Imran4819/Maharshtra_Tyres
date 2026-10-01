@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:maharashtra_tyres/services/reminder_notification_service.dart';
+import 'package:maharashtra_tyres/services/push_notification_service.dart';
 import 'package:maharashtra_tyres/widgets/app_navigation.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/screens/add_customer_screen.dart';
@@ -32,6 +33,7 @@ void main() async {
   await ReminderNotificationService.instance.initialize(
     navigatorKey: appNavigatorKey,
   );
+  await PushNotificationService.instance.initialize();
   runApp(const MaharashtraTyresApp());
 }
 
@@ -51,10 +53,11 @@ class MaharashtraTyresApp extends StatelessWidget {
               navigatorObservers: [appNavigationObserver],
               builder: (context, child) => ValueListenableBuilder<String?>(
                 valueListenable: appCurrentRoute,
-                builder: (context, routeName, navigatorChild) => AppNavigationShell(
-                  routeName: routeName,
-                  child: navigatorChild ?? const SizedBox.shrink(),
-                ),
+                builder: (context, routeName, navigatorChild) =>
+                    AppNavigationShell(
+                      routeName: routeName,
+                      child: navigatorChild ?? const SizedBox.shrink(),
+                    ),
                 child: child,
               ),
               debugShowCheckedModeBanner: false,

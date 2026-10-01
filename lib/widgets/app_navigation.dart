@@ -201,13 +201,11 @@ class AppSidebarPanel extends StatelessWidget {
     _SidebarDestination(Icons.receipt_long_outlined, 'Invoices', '/invoices'),
     _SidebarDestination(Icons.receipt_outlined, 'Bills', '/bills'),
     _SidebarDestination(Icons.alarm_outlined, 'Reminders', '/reminders'),
-    _SidebarDestination(Icons.bar_chart_outlined, 'Reports', '/sales'),
     _SidebarDestination(
       Icons.account_balance_wallet_outlined,
       'Revenue',
       '/sales',
     ),
-    _SidebarDestination(Icons.local_shipping_outlined, 'Suppliers', null),
     _SidebarDestination(
       Icons.notifications_outlined,
       'Notifications',

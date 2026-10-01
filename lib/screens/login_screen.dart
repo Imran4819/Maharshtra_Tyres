@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:maharashtra_tyres/services/auth_service.dart';
+import 'package:maharashtra_tyres/services/push_notification_service.dart';
 import 'package:maharashtra_tyres/services/language_service.dart';
 import 'package:maharashtra_tyres/theme/app_theme.dart';
 
@@ -85,6 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = false);
 
     if (error == null) {
+      unawaited(PushNotificationService.instance.registerIfEnabled());
       Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

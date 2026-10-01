@@ -86,6 +86,16 @@ class BillService {
     _ensureSuccess(response);
   }
 
+  static Future<void> deleteBill(String id) async {
+    final response = await http
+        .delete(
+          Uri.parse('${await _billsUrl()}/${Uri.encodeComponent(id)}'),
+          headers: await _headers(),
+        )
+        .timeout(const Duration(seconds: 30));
+    _ensureSuccess(response);
+  }
+
   static dynamic _decode(String body) {
     if (body.trim().isEmpty) return null;
     try {
